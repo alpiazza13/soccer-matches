@@ -1,0 +1,66 @@
+{
+    "area": {
+      "id": 2077,
+      "name": "Europe",
+      "code": "EUR",
+      "flag": "https://crests.football-data.org/EUR.svg"
+    },
+    "competition": {
+      "id": 2001,
+      "name": "UEFA Champions League",
+      "code": "CL",
+      "type": "CUP",
+      "emblem": "https://crests.football-data.org/CL.png"
+    },
+    "season": {
+      "id": 2454,
+      "startDate": "2025-09-16",
+      "endDate": "2026-05-30",
+      "currentMatchday": 1,
+      "winner": null
+    },
+    "id": 552049,
+    "utcDate": "2025-09-16T16:45:00Z",
+    "status": "FINISHED",
+    "matchday": 1,
+    "stage": "LEAGUE_STAGE",
+    "group": null,
+    "lastUpdated": "2025-09-17T00:21:04Z",
+    "homeTeam": {
+      "id": 674,
+      "name": "PSV",
+      "shortName": "PSV",
+      "tla": "PSV",
+      "crest": "https://crests.football-data.org/674.png"
+    },
+    "awayTeam": {
+      "id": 3929,
+      "name": "Royale Union Saint-Gilloise",
+      "shortName": "Union SG",
+      "tla": "USG",
+      "crest": "https://crests.football-data.org/3929.png"
+    },
+    "score": {
+      "winner": "AWAY_TEAM",
+      "duration": "REGULAR",
+      "fullTime": {
+        "home": 1,
+        "away": 3
+      },
+      "halfTime": {
+        "home": 0,
+        "away": 2
+      }
+    },
+    "odds": {
+      "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+    },
+    "referees": [
+      {
+        "id": 11580,
+        "name": "Anthony Taylor",
+        "type": "REFEREE",
+        "nationality": "England"
+      }
+    ]
+  }
