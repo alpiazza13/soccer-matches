@@ -5,6 +5,7 @@ from typing import List, Dict, Optional, Tuple
 from http.client import responses
 
 from app.utils.time_provider import TimeProvider, SystemTimeProvider, DatetimeProvider, SystemDatetimeProvider
+from app.schemas import MatchSchema, TeamSchema, CompetitionSchema
 
 
 class FootballAPIClient:
@@ -149,7 +150,7 @@ class FootballAPIClient:
         
         for match in matches:
             # Extract match information
-            match_info = self._extract_match_info(match, competition)
+            match_info = self._extract_match_info(match)
             processed_matches.append(match_info)
             
             # Store raw data
@@ -161,7 +162,7 @@ class FootballAPIClient:
         
         return processed_matches, raw_matches
     
-    def _extract_match_info(self, match: Dict, competition: str) -> Dict:
+    def _extract_match_info(self, raw_data: Dict) -> MatchSchema:
         """
         Extract relevant information from a match API response.
         
@@ -172,36 +173,37 @@ class FootballAPIClient:
         Returns:
             Dictionary with extracted match information
         """
-        home_team_data = match["homeTeam"]
-        away_team_data = match["awayTeam"]
-        comp_data = match["competition"]
+        home = TeamSchema(
+                id=raw_data["homeTeam"]["id"],
+                name=raw_data["homeTeam"]["name"],
+                short_name=raw_data["homeTeam"].get("shortName"),
+                tla=raw_data["homeTeam"].get("tla")
+            )
+        away = TeamSchema(
+            id=raw_data["awayTeam"]["id"],
+            name=raw_data["awayTeam"]["name"],
+            short_name=raw_data["awayTeam"].get("shortName"),
+            tla=raw_data["awayTeam"].get("tla")
+        )
         
-        match_date_utc = match["utcDate"]
-        match_date_obj = datetime.fromisoformat(match_date_utc.replace('Z', '+00:00'))
-        
-        return {
-            "match_id": match["id"],
-            "status": match["status"],
-            "utc_date": match_date_obj,
-            "score_json": match["score"],
-            "competition": {
-                "id": comp_data["id"],
-                "name": comp_data["name"],
-                "code": comp_data.get("code")
-            },
-            "home_team": {
-                "id": home_team_data["id"],
-                "name": home_team_data["name"],
-                "short_name": home_team_data.get("shortName"),
-                "tla": home_team_data.get("tla")
-            },
-            "away_team": {
-                "id": away_team_data["id"],
-                "name": away_team_data["name"],
-                "short_name": away_team_data.get("shortName"),
-                "tla": away_team_data.get("tla")
-            }
-        }
+        # 2. Clean the competition
+        comp = CompetitionSchema(
+            id=raw_data["competition"]["id"],
+            name=raw_data["competition"]["name"],
+            code=raw_data["competition"]["code"]
+        )
+
+        # 3. Return the validated MatchSchema
+        return MatchSchema(
+            match_id=raw_data["id"],
+            status=raw_data["status"],
+            utc_date=datetime.fromisoformat(raw_data["utcDate"].replace('Z', '+00:00')),
+            home_team=home,
+            away_team=away,
+            competition=comp,
+            score=raw_data["score"]
+        )
+
     
     def fetch_all_matches(
         self, 

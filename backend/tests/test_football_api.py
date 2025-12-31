@@ -72,18 +72,21 @@ class TestFootballAPIClient:
         assert call_args[1]["params"]["dateTo"] == "2024-01-31"
         assert call_args[1]["headers"]["X-Auth-Token"] == api_token
 
-        match_api_data = sample_api_response["matches"][0]
         
         # Verify results
         assert len(processed_matches) == len(sample_api_response["matches"])
         assert len(raw_matches) == len(processed_matches)
-        assert isinstance(processed_matches, list)
-        assert isinstance(raw_matches, list)
-        
+
+        from app.schemas import MatchSchema, TeamSchema
+        assert isinstance(processed_matches[0], MatchSchema)
+        assert isinstance(raw_matches[0], dict)
+
         match = processed_matches[0]
-        assert "match_id" in match
-        assert "home_team" in match
-        assert isinstance(match["home_team"], dict)
+        assert hasattr(match, "match_id")
+        assert match.match_id == sample_api_response["matches"][0]["id"]
+        
+        assert isinstance(match.home_team, TeamSchema)
+        assert match.home_team.name == sample_api_response["matches"][0]["homeTeam"]["name"]
 
       
     
@@ -189,27 +192,27 @@ class TestFootballAPIClient:
         """Test match info extraction logic."""
         client = FootballAPIClient(api_token=api_token)
         
-        match = client._extract_match_info(sample_match_data, "premier league")
+        match = client._extract_match_info(sample_match_data)
         
-        assert match["match_id"] == 123456
-        assert match["status"] == "FINISHED"
-        assert match["utc_date"] == datetime.fromisoformat(sample_match_data["utcDate"].replace('Z', '+00:00'))
+        assert match.match_id == 123456
+        assert match.status == "FINISHED"
+        assert match.utc_date == datetime.fromisoformat(sample_match_data["utcDate"].replace('Z', '+00:00'))
 
-        assert match["score_json"] == sample_match_data["score"]
+        assert match.score == sample_match_data["score"]
 
-        assert match["competition"]["name"] == sample_match_data["competition"]["name"]
-        assert match["competition"]["code"] == sample_match_data["competition"]["code"]
-        assert match["competition"]["id"] == sample_match_data["competition"]["id"]
+        assert match.competition.name == sample_match_data["competition"]["name"]
+        assert match.competition.code == sample_match_data["competition"]["code"]
+        assert match.competition.id == sample_match_data["competition"]["id"]
 
-        assert match["home_team"]["name"] == sample_match_data["homeTeam"]["name"]
-        assert match["home_team"]["short_name"] == sample_match_data["homeTeam"]["shortName"]
-        assert match["home_team"]["tla"] == sample_match_data["homeTeam"]["tla"]
-        assert match["home_team"]["id"] == sample_match_data["homeTeam"]["id"]
+        assert match.home_team.name == sample_match_data["homeTeam"]["name"]
+        assert match.home_team.short_name == sample_match_data["homeTeam"]["shortName"]
+        assert match.home_team.tla == sample_match_data["homeTeam"]["tla"]
+        assert match.home_team.id == sample_match_data["homeTeam"]["id"]
 
-        assert match["away_team"]["name"] == sample_match_data["awayTeam"]["name"]
-        assert match["away_team"]["short_name"] == sample_match_data["awayTeam"]["shortName"]
-        assert match["away_team"]["tla"] == sample_match_data["awayTeam"]["tla"]
-        assert match["away_team"]["id"] == sample_match_data["awayTeam"]["id"]
+        assert match.away_team.name == sample_match_data["awayTeam"]["name"]
+        assert match.away_team.short_name == sample_match_data["awayTeam"]["shortName"]
+        assert match.away_team.tla == sample_match_data["awayTeam"]["tla"]
+        assert match.away_team.id == sample_match_data["awayTeam"]["id"]
 
 
 

@@ -64,10 +64,10 @@ async def test_fetch(
         # Print first few matches to console
         for i, match in enumerate(processed_matches[:5], 1):
             print(f"Match {i}:")
-            print(f"  {match['home_team']['name']} vs {match['away_team']['name']}")
-            print(f"  Score: {match['score_json']['fullTime']['home']} - {match['score_json']['fullTime']['away']}")
-            print(f"  Date: {match['utc_date']}")
-            print(f"  Competition: {match['competition']['name']}")
+            print(f"  {match.home_team.name} vs {match.away_team.name}")
+            print(f"  Score: {match.score['fullTime']['home']} - {match.score['fullTime']['away']}")
+            print(f"  Date: {match.utc_date}")
+            print(f"  Competition: {match.competition.name}")
             print()
         
         if len(processed_matches) > 5:
