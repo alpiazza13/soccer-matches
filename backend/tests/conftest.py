@@ -76,18 +76,30 @@ def sample_match_data() -> dict:
     return {
         "id": 123456,
         "utcDate": "2024-01-15T15:30:00Z",
+        "status": "FINISHED",
         "homeTeam": {
-            "shortName": "Arsenal"
+            "name": "Arsenal FC",
+            "shortName": "Arsenal",
+            "tla": "ARS",
+            "id": 674
         },
         "awayTeam": {
-            "shortName": "Chelsea"
+            "name": "Chelsea FC",
+            "shortName": "Chelsea",
+            "tla": "CHE",
+            "id": 3929
         },
         "score": {
             "fullTime": {
                 "home": 2,
                 "away": 1
             },
-            "winner": "HOME_TEAM"
+        "winner": "HOME_TEAM"
+        },
+        "competition": {
+            "id": 2001,
+            "name": "Premier League",
+            "code": "PL"
         }
     }
 

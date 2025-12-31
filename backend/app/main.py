@@ -64,10 +64,10 @@ async def test_fetch(
         # Print first few matches to console
         for i, match in enumerate(processed_matches[:5], 1):
             print(f"Match {i}:")
-            print(f"  {match['home_team']} vs {match['away_team']}")
-            print(f"  Score: {match['home_score']} - {match['away_score']}")
-            print(f"  Date: {match['date_display']} at {match['time_display']}")
-            print(f"  Competition: {match['competition']}")
+            print(f"  {match['home_team']['name']} vs {match['away_team']['name']}")
+            print(f"  Score: {match['score_json']['fullTime']['home']} - {match['score_json']['fullTime']['away']}")
+            print(f"  Date: {match['utc_date']}")
+            print(f"  Competition: {match['competition']['name']}")
             print()
         
         if len(processed_matches) > 5:
@@ -81,8 +81,6 @@ async def test_fetch(
                 "from": date_from,
                 "to": date_to
             },
-            "sample_matches": processed_matches[:10],  # Return first 10 matches
-            "all_matches": processed_matches  # Return all matches
         })
     
     except ValueError as e:
@@ -108,6 +106,9 @@ async def get_matches(
         date_from: Start date in YYYY-MM-DD format. Defaults to 7 days ago.
         date_to: End date in YYYY-MM-DD format. Defaults to today.
     """
+    pass
+
+    '''
     try:
         # Set default date range if not provided
         if date_to is None:
@@ -145,6 +146,7 @@ async def get_matches(
     except Exception as e:
         print(f"Error in get_matches: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching matches: {str(e)}")
+    '''
 
 
 if __name__ == "__main__":

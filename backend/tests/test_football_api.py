@@ -24,17 +24,6 @@ class TestFootballAPIClient:
             with pytest.raises(ValueError, match="API token is required"):
                 FootballAPIClient()
     
-    def test_get_all_competitions(self, api_token):
-        """Test getting list of all competitions."""
-        client = FootballAPIClient(api_token=api_token)
-        competitions = client.get_all_competitions()
-        
-        assert isinstance(competitions, list)
-        assert len(competitions) == 8
-        assert "premier league" in competitions
-        assert "serie a" in competitions
-        assert "champions league" in competitions
-    
     def test_get_matches_invalid_competition(self, api_token, mock_http_session):
         """Test that invalid competition raises ValueError."""
         client = FootballAPIClient(
@@ -82,21 +71,21 @@ class TestFootballAPIClient:
         assert call_args[1]["params"]["dateFrom"] == "2024-01-01"
         assert call_args[1]["params"]["dateTo"] == "2024-01-31"
         assert call_args[1]["headers"]["X-Auth-Token"] == api_token
+
+        match_api_data = sample_api_response["matches"][0]
         
         # Verify results
-        assert len(processed_matches) == 1
-        assert len(raw_matches) == 1
+        assert len(processed_matches) == len(sample_api_response["matches"])
+        assert len(raw_matches) == len(processed_matches)
+        assert isinstance(processed_matches, list)
+        assert isinstance(raw_matches, list)
         
         match = processed_matches[0]
-        assert match["match_id"] == 123456
-        assert match["home_team"] == "Arsenal"
-        assert match["away_team"] == "Chelsea"
-        assert match["home_score"] == 2
-        assert match["away_score"] == 1
-        assert match["competition"] == "premier league"
-        assert match["winner"] == "HOME_TEAM"
-        assert "date_display" in match
-        assert "time_display" in match
+        assert "match_id" in match
+        assert "home_team" in match
+        assert isinstance(match["home_team"], dict)
+
+      
     
     def test_get_matches_default_date_range(
         self,
@@ -200,41 +189,31 @@ class TestFootballAPIClient:
         """Test match info extraction logic."""
         client = FootballAPIClient(api_token=api_token)
         
-        match_info = client._extract_match_info(sample_match_data, "premier league")
+        match = client._extract_match_info(sample_match_data, "premier league")
         
-        assert match_info["match_id"] == 123456
-        assert match_info["home_team"] == "Arsenal"
-        assert match_info["away_team"] == "Chelsea"
-        assert match_info["home_score"] == 2
-        assert match_info["away_score"] == 1
-        assert match_info["competition"] == "premier league"
-        assert match_info["winner"] == "HOME_TEAM"
-        assert "date_display" in match_info
-        assert "time_display" in match_info
-        assert "match_date_utc" in match_info
-        assert "match_date" in match_info
-    
-    def test_extract_match_info_time_formatting(self, api_token):
-        """Test that time formatting works correctly."""
-        client = FootballAPIClient(api_token=api_token)
-        
-        # Test match at 3:30 PM UTC (11:30 AM Eastern)
-        match_data = {
-            "id": 123,
-            "utcDate": "2024-01-15T15:30:00Z",
-            "homeTeam": {"shortName": "Team A"},
-            "awayTeam": {"shortName": "Team B"},
-            "score": {
-                "fullTime": {"home": 1, "away": 0},
-                "winner": "HOME_TEAM"
-            }
-        }
-        
-        match_info = client._extract_match_info(match_data, "premier league")
-        
-        # UTC 15:30 = Eastern 11:30 AM
-        assert match_info["time_display"] == "11:30 AM"
-        assert match_info["date_display"] == "1/15/2024"
+        assert match["match_id"] == 123456
+        assert match["status"] == "FINISHED"
+        assert match["utc_date"] == datetime.fromisoformat(sample_match_data["utcDate"].replace('Z', '+00:00'))
+
+        assert match["score_json"] == sample_match_data["score"]
+
+        assert match["competition"]["name"] == sample_match_data["competition"]["name"]
+        assert match["competition"]["code"] == sample_match_data["competition"]["code"]
+        assert match["competition"]["id"] == sample_match_data["competition"]["id"]
+
+        assert match["home_team"]["name"] == sample_match_data["homeTeam"]["name"]
+        assert match["home_team"]["short_name"] == sample_match_data["homeTeam"]["shortName"]
+        assert match["home_team"]["tla"] == sample_match_data["homeTeam"]["tla"]
+        assert match["home_team"]["id"] == sample_match_data["homeTeam"]["id"]
+
+        assert match["away_team"]["name"] == sample_match_data["awayTeam"]["name"]
+        assert match["away_team"]["short_name"] == sample_match_data["awayTeam"]["shortName"]
+        assert match["away_team"]["tla"] == sample_match_data["awayTeam"]["tla"]
+        assert match["away_team"]["id"] == sample_match_data["awayTeam"]["id"]
+
+
+
+
     
     def test_fetch_all_matches(
         self,

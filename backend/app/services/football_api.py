@@ -172,50 +172,36 @@ class FootballAPIClient:
         Returns:
             Dictionary with extracted match information
         """
-        home_team = match["homeTeam"]["shortName"]
-        away_team = match["awayTeam"]["shortName"]
-        home_score = match["score"]["fullTime"]["home"]
-        away_score = match["score"]["fullTime"]["away"]
-        match_date_utc = match["utcDate"]
-        match_id = match["id"]
+        home_team_data = match["homeTeam"]
+        away_team_data = match["awayTeam"]
+        comp_data = match["competition"]
         
-        # Convert UTC date to datetime object
+        match_date_utc = match["utcDate"]
         match_date_obj = datetime.fromisoformat(match_date_utc.replace('Z', '+00:00'))
         
-        # Convert to Eastern time (UTC-4)
-        match_date_eastern = match_date_obj - timedelta(hours=4)
-        
-        # Format date without leading zeros (cross-platform compatible)
-        month = str(match_date_eastern.month)
-        day = str(match_date_eastern.day)
-        year = str(match_date_eastern.year)
-        date_display = f"{month}/{day}/{year}"
-        
-        # Format time without leading zeros
-        hour_12 = match_date_eastern.hour % 12
-        if hour_12 == 0:
-            hour_12 = 12
-        minute = str(match_date_eastern.minute).zfill(2)
-        am_pm = "AM" if match_date_eastern.hour < 12 else "PM"
-        time_display = f"{hour_12}:{minute} {am_pm}"
-        
         return {
-            "match_id": match_id,
-            "home_team": home_team,
-            "away_team": away_team,
-            "home_score": home_score,
-            "away_score": away_score,
-            "match_date_utc": match_date_utc,
-            "match_date": match_date_obj.isoformat(),
-            "date_display": date_display,
-            "time_display": time_display,
-            "competition": competition,
-            "winner": match["score"]["winner"]
+            "match_id": match["id"],
+            "status": match["status"],
+            "utc_date": match_date_obj,
+            "score_json": match["score"],
+            "competition": {
+                "id": comp_data["id"],
+                "name": comp_data["name"],
+                "code": comp_data.get("code")
+            },
+            "home_team": {
+                "id": home_team_data["id"],
+                "name": home_team_data["name"],
+                "short_name": home_team_data.get("shortName"),
+                "tla": home_team_data.get("tla")
+            },
+            "away_team": {
+                "id": away_team_data["id"],
+                "name": away_team_data["name"],
+                "short_name": away_team_data.get("shortName"),
+                "tla": away_team_data.get("tla")
+            }
         }
-    
-    def get_all_competitions(self) -> List[str]:
-        """Get list of all supported competition names."""
-        return list(self.COMPETITION_IDS.keys())
     
     def fetch_all_matches(
         self, 

@@ -35,7 +35,7 @@ class Match(Base):
     home_team = relationship("Team", foreign_keys=[home_team_id], back_populates="matches_as_home")
     away_team = relationship("Team", foreign_keys=[away_team_id], back_populates="matches_as_away")
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(datetime.timezone.utc))
 
 class Competition(Base):
     __tablename__ = "competitions"

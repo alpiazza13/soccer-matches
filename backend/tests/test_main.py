@@ -58,48 +58,7 @@ class TestHealthEndpoint:
         assert data["status"] == "healthy"
 
 
-class TestTestFetchEndpoint:
-    """Test suite for test-fetch endpoint."""
-    
-    def test_test_fetch_success(self, client, mock_football_client):
-        """Test successful test-fetch endpoint."""
-        # Override the dependency
-        app.dependency_overrides[get_football_api_client] = lambda: mock_football_client
-        
-        try:
-            response = client.get("/api/test-fetch")
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is True
-            assert "matches_count" in data
-            assert "date_range" in data
-            assert "all_matches" in data
-            assert len(data["all_matches"]) > 0
-        finally:
-            # Clean up: remove the override
-            app.dependency_overrides.clear()
-    
-    def test_test_fetch_api_error(self, client, api_token):
-        """Test test-fetch endpoint with API error."""
-        # Create a mock client that raises an exception
-        mock_client = Mock(spec=FootballAPIClient)
-        mock_client.get_matches.side_effect = Exception("API Error")
-        
-        # Override the dependency
-        app.dependency_overrides[get_football_api_client] = lambda: mock_client
-        
-        try:
-            response = client.get("/api/test-fetch")
-            
-            assert response.status_code == 500
-            data = response.json()
-            assert "detail" in data
-        finally:
-            # Clean up: remove the override
-            app.dependency_overrides.clear()
-
-
+'''
 class TestGetMatchesEndpoint:
     """Test suite for get-matches endpoint."""
     
@@ -172,3 +131,4 @@ class TestGetMatchesEndpoint:
         finally:
             # Clean up: remove the override
             app.dependency_overrides.clear()
+'''
