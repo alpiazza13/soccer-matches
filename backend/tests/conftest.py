@@ -16,6 +16,8 @@ from app.models import Team, Match, Competition
 
 from app.utils.time_provider import TimeProvider, DatetimeProvider
 from app.schemas import CompetitionSchema, TeamSchema, MatchSchema, ScoreSchema, ScoreValues, UserCreate
+from fastapi.testclient import TestClient
+from app.main import app, get_db
 
 
 class MockTimeProvider(TimeProvider):
@@ -152,6 +154,18 @@ def user_payload():
         return UserCreate(email=email or f"user{i}@example.com", password=password).model_dump()
 
     return _make
+
+'''
+@pytest.fixture
+def client_with_db(db_session):
+    """TestClient that uses the transactional `db_session` via dependency override."""
+    app.dependency_overrides[get_db] = lambda: db_session
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+'''
 
 @pytest.fixture
 def sample_competition():
