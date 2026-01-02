@@ -6,6 +6,10 @@ from unittest.mock import Mock, MagicMock
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.database import Base, DATABASE_URL
+
 from app.utils.time_provider import TimeProvider, DatetimeProvider
 from app.schemas import CompetitionSchema, TeamSchema, MatchSchema, ScoreSchema, ScoreValues
 
@@ -168,3 +172,19 @@ def sample_match() -> MatchSchema:
         competition=comp,
         score=score
     )
+
+@pytest.fixture(scope="function")
+def db_session():
+    """Provides a real SQLAlchemy session connected to the test database."""
+    engine = create_engine(DATABASE_URL)
+    
+    Base.metadata.create_all(bind=engine)
+    
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = TestingSessionLocal()
+
+    try:
+        yield session
+    finally:
+        session.close()
+        Base.metadata.drop_all(bind=engine)

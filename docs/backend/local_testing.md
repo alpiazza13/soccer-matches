@@ -4,6 +4,8 @@
 	2. Go to http://localhost:8000/api/test-fetch
 	3. Check the terminal output for match details
 3. To run pytest suite, enter `pytest` from root folder
+	- To run a specific test, run the below from backend directory:
+		- `python -m pytest tests/test_user_interactions.py -v`
 4. Test sync_db.py
 	1. From backend directory, run `python -m app.scripts.sync_db`
 	2. Check results in Supabase and terminal output.

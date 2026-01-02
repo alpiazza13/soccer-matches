@@ -74,3 +74,4 @@ class UserMatch(Base):
     last_updated = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="user_matches")
+    match = relationship("Match", back_populates="user_matches")
