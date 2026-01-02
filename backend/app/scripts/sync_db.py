@@ -9,7 +9,7 @@ from app.config import DEFAULT_SYNC_START_DATE, LOOKBACK_DAYS
 # Add backend to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.database import SessionLocal
+from app.database import SessionLocal, Base, engine
 from app.models import Team, Match, Competition
 from app.schemas import TeamSchema, MatchSchema, CompetitionSchema
 from app.services.football_api import FootballAPIClient
@@ -85,6 +85,9 @@ def upsert_match(db: Session, m: MatchSchema):
 
 def sync_data():
     print("Starting sync DB...")
+    if os.getenv("ENV") != "production":
+        Base.metadata.create_all(bind=engine)
+
     db = SessionLocal()
     client = FootballAPIClient()
     
@@ -107,4 +110,7 @@ def sync_data():
     print("Finished syncing db.")
 
 if __name__ == "__main__":
+    if "sqlite" in os.getenv("DATABASE_URL", ""):
+        print("Refusing to run sync_data in test environment")
+        raise SystemExit(1)
     sync_data()

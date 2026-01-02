@@ -22,7 +22,6 @@ def test_user_mark_match_as_done(db_session):
         score={"fullTime": {"home": 2, "away": 2}}
     )
     
-    # 3. Setup: Create a User
     user = User(
         email="test@example.com",
         hashed_password="fakehashedpassword"

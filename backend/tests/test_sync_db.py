@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from app.scripts.sync_db import get_sync_start_date, upsert_competition, upsert_team, upsert_match
 from app.models import Match
 from app.config import DEFAULT_SYNC_START_DATE, LOOKBACK_DAYS
+from app.scripts import sync_db
 
 def test_get_sync_start_date_empty_db():
     mock_db = MagicMock()
@@ -128,3 +129,62 @@ def test_upsert_match_statement_structure(mock_db, sample_match):
     assert "ON CONFLICT (external_id) DO UPDATE SET" in compiled_stmt
     assert "utc_date =" in compiled_stmt
     assert "score =" in compiled_stmt
+
+
+def test_sync_data_success(monkeypatch, sample_match):
+    mock_db = MagicMock()
+    mock_db.commit = MagicMock()
+    mock_db.close = MagicMock()
+
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setattr(sync_db, "SessionLocal", lambda: mock_db)
+
+    client = MagicMock()
+    client.fetch_all_matches.return_value = ([sample_match], 1)
+    monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
+
+    upsert_comp = MagicMock()
+    upsert_team = MagicMock()
+    upsert_match = MagicMock()
+    monkeypatch.setattr(sync_db, "upsert_competition", upsert_comp)
+    monkeypatch.setattr(sync_db, "upsert_team", upsert_team)
+    monkeypatch.setattr(sync_db, "upsert_match", upsert_match)
+
+    sync_db.sync_data()
+
+    upsert_comp.assert_called_once_with(mock_db, sample_match.competition)
+    assert upsert_team.call_count == 2
+    upsert_match.assert_called_once_with(mock_db, sample_match)
+    mock_db.commit.assert_called_once()
+    mock_db.close.assert_called_once()
+
+
+def test_sync_data_continues_on_upsert_error(monkeypatch, sample_match):
+    mock_db = MagicMock()
+    mock_db.commit = MagicMock()
+    mock_db.close = MagicMock()
+
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setattr(sync_db, "SessionLocal", lambda: mock_db)
+
+    client = MagicMock()
+    m1 = sample_match
+    m2 = sample_match.model_copy(deep=True)
+    m2.match_id = 999999
+    client.fetch_all_matches.return_value = ([m1, m2], 2)
+    monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
+
+    upsert_comp = MagicMock(side_effect=[Exception("boom"), None])
+    upsert_team = MagicMock()
+    upsert_match = MagicMock()
+    monkeypatch.setattr(sync_db, "upsert_competition", upsert_comp)
+    monkeypatch.setattr(sync_db, "upsert_team", upsert_team)
+    monkeypatch.setattr(sync_db, "upsert_match", upsert_match)
+
+    # Should not raise despite first upsert raising
+    sync_db.sync_data()
+
+    assert mock_db.commit.called
+    assert mock_db.close.called
+    assert upsert_comp.call_count == 2
+    upsert_match.assert_called_with(mock_db, m2)

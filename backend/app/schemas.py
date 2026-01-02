@@ -1,29 +1,30 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import Optional, Dict, Any
+from app.models import Match, Team, Competition
 
 class TeamSchema(BaseModel):
     """Data structure for Teams."""
-    id: int
+    id: int = Field(alias=Team.external_id.key)
     name: str
     short_name: Optional[str] = None
     tla: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class CompetitionSchema(BaseModel):
     """Data structure for Competitions."""
-    id: int
+    id: int = Field(alias=Competition.external_id.key)
     name: str
     code: str
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class ScoreValues(BaseModel):
     """Sub-structure for actual score numbers."""
     home: Optional[int] = None
     away: Optional[int] = None
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(from_attributes=True, extra='allow')
 
 class ScoreSchema(BaseModel):
     """Structured score data with 'extra=allow' for API flexibility."""
@@ -33,14 +34,14 @@ class ScoreSchema(BaseModel):
     halfTime: Optional[ScoreValues] = None
     
     # if the API adds new fields, Pydantic will still accept them in _extract_match_info and store them in the object
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(from_attributes=True, extra='allow')
 
 class MatchSchema(BaseModel):
     """
     The master structure for a Match. 
     Nests Team and Competition schemas for full type-safety.
     """
-    match_id: int
+    match_id: int = Field(alias=Match.external_id.key) # use external_id from DB as match_id
     status: str
     utc_date: datetime
     home_team: TeamSchema
@@ -48,4 +49,4 @@ class MatchSchema(BaseModel):
     competition: CompetitionSchema
     score: ScoreSchema
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)

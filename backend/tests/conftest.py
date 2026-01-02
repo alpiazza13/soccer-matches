@@ -1,14 +1,17 @@
 """
 Pytest configuration and shared fixtures.
 """
+import os
 import pytest
 from unittest.mock import Mock, MagicMock
 from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.database import Base, DATABASE_URL
+from sqlalchemy.orm import sessionmaker, Session
+from app.database import Base
+
+from app.models import Team, Match, Competition
 
 from app.utils.time_provider import TimeProvider, DatetimeProvider
 from app.schemas import CompetitionSchema, TeamSchema, MatchSchema, ScoreSchema, ScoreValues
@@ -173,18 +176,54 @@ def sample_match() -> MatchSchema:
         score=score
     )
 
+# Create a single engine for the test session
+test_engine = create_engine("sqlite:///./test_db.sqlite", connect_args={"check_same_thread": False})
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_database():
+    """Create all tables once for the entire test run."""
+    Base.metadata.drop_all(bind=test_engine)
+    Base.metadata.create_all(bind=test_engine)
+    yield
+    # Optional: Clean up after all tests are done
+    # if os.path.exists("./test_db.sqlite"): os.remove("./test_db.sqlite")
+
 @pytest.fixture(scope="function")
 def db_session():
-    """Provides a real SQLAlchemy session connected to the test database."""
-    engine = create_engine(DATABASE_URL)
+    """Each test gets its own transaction on the test_engine."""
+    connection = test_engine.connect()
+    transaction = connection.begin()
     
-    Base.metadata.create_all(bind=engine)
-    
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = TestingSessionLocal()
+    # Bind the session to the connection we just opened
+    session = Session(bind=connection)
 
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
+    yield session
+
+    session.close()
+    transaction.rollback()
+    connection.close()
+
+
+@pytest.fixture
+def persisted_match(db_session) -> Match:
+    """Create and persist a Team, Competition and Match for tests."""
+    home = Team(external_id=1, name="Home FC", short_name="Home", tla="HME")
+    away = Team(external_id=2, name="Away FC", short_name="Away", tla="AWY")
+    comp = Competition(external_id=2001, name="Premier League", code="PL")
+
+    db_session.add_all([home, away, comp])
+    db_session.commit()
+
+    match = Match(
+        external_id=12345,
+        status="FINISHED",
+        utc_date=datetime(2024, 1, 15, 15, 30, 0),
+        home_team_id=home.id,
+        away_team_id=away.id,
+        competition_id=comp.id,
+        score={"winner": "HOME_TEAM", "duration": "REGULAR", "fullTime": {"home": 2, "away": 1}}
+    )
+
+    db_session.add(match)
+    db_session.commit()
+    db_session.refresh(match)
+    return match

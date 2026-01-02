@@ -5,11 +5,13 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, MagicMock
 from datetime import datetime
+from types import SimpleNamespace
 
-from app.main import app
+from app.main import app, get_db
 from app.dependencies import get_football_api_client
 from app.services.football_api import FootballAPIClient
 from tests.conftest import MockTimeProvider, MockDatetimeProvider
+from app.schemas import MatchSchema
 
 
 @pytest.fixture
@@ -19,7 +21,7 @@ def client():
 
 
 @pytest.fixture
-def mock_football_client(api_token, mock_http_session, mock_time_provider, mock_datetime_provider, sample_api_response):
+def mock_football_client(api_token: str, mock_http_session: Mock, mock_time_provider: MockTimeProvider, mock_datetime_provider: MockDatetimeProvider, sample_api_response: dict):
     """Fixture providing a mocked FootballAPIClient."""
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -37,7 +39,7 @@ def mock_football_client(api_token, mock_http_session, mock_time_provider, mock_
 class TestRootEndpoint:
     """Test suite for root endpoint."""
     
-    def test_root_endpoint(self, client):
+    def test_root_endpoint(self, client: TestClient):
         """Test root endpoint returns API information."""
         response = client.get("/")
         assert response.status_code == 200
@@ -50,7 +52,7 @@ class TestRootEndpoint:
 class TestHealthEndpoint:
     """Test suite for health check endpoint."""
     
-    def test_health_endpoint(self, client):
+    def test_health_endpoint(self, client: TestClient):
         """Test health check endpoint."""
         response = client.get("/health")
         assert response.status_code == 200
@@ -58,77 +60,31 @@ class TestHealthEndpoint:
         assert data["status"] == "healthy"
 
 
-'''
-class TestGetMatchesEndpoint:
-    """Test suite for get-matches endpoint."""
-    
-    def test_get_matches_with_competition(self, client, mock_football_client):
-        """Test get-matches endpoint with competition parameter."""
-        # Override the dependency
-        app.dependency_overrides[get_football_api_client] = lambda: mock_football_client
-        
-        try:
-            response = client.get("/api/matches?competition=premier%20league")
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is True
-            assert data["competition"] == "premier league"
-            assert "matches" in data
-            assert "matches_count" in data
-        finally:
-            # Clean up: remove the override
-            app.dependency_overrides.clear()
-    
-    def test_get_matches_with_date_range(self, client, mock_football_client):
-        """Test get-matches endpoint with date range."""
-        # Override the dependency
-        app.dependency_overrides[get_football_api_client] = lambda: mock_football_client
-        
-        try:
-            response = client.get("/api/matches?date_from=2024-01-01&date_to=2024-01-31")
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is True
-            assert data["date_range"]["from"] == "2024-01-01"
-            assert data["date_range"]["to"] == "2024-01-31"
-        finally:
-            # Clean up: remove the override
-            app.dependency_overrides.clear()
-    
-    def test_get_matches_all_competitions(self, client, mock_football_client):
-        """Test get-matches endpoint without competition (all competitions)."""
-        # Override the dependency
-        app.dependency_overrides[get_football_api_client] = lambda: mock_football_client
-        
-        try:
-            response = client.get("/api/matches")
-            
-            assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is True
-            assert data["competition"] == "all"
-        finally:
-            # Clean up: remove the override
-            app.dependency_overrides.clear()
-    
-    def test_get_matches_invalid_competition(self, client, api_token):
-        """Test get-matches endpoint with invalid competition."""
-        # Create a mock client that raises ValueError
-        mock_client = Mock(spec=FootballAPIClient)
-        mock_client.get_matches.side_effect = ValueError("Unknown competition: invalid")
-        
-        # Override the dependency
-        app.dependency_overrides[get_football_api_client] = lambda: mock_client
-        
-        try:
-            response = client.get("/api/matches?competition=invalid")
-            
-            assert response.status_code == 400
-            data = response.json()
-            assert "detail" in data
-        finally:
-            # Clean up: remove the override
-            app.dependency_overrides.clear()
-'''
+def test_matches_endpoint_empty():
+    """GET /matches should return an empty list when DB has no matches."""
+    mock_db = MagicMock()
+    mock_db.query.return_value.all.return_value = []
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        with TestClient(app) as client_local:
+            res = client_local.get("/matches")
+            assert res.status_code == 200
+            assert res.json() == []
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_matches_endpoint_returns_match(db_session, persisted_match):
+    """GET /matches should return serialized matches from DB using MatchSchema."""
+    app.dependency_overrides[get_db] = lambda: db_session
+    try:
+        with TestClient(app) as client_local:
+            res = client_local.get("/matches")
+            assert res.status_code == 200
+            body = res.json()
+            assert isinstance(body, list) and len(body) == 1
+            expected = MatchSchema.model_validate(persisted_match).model_dump(by_alias=True, mode='json')
+            assert body[0] == expected
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
