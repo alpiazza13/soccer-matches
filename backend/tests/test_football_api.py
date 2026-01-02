@@ -198,7 +198,17 @@ class TestFootballAPIClient:
         assert match.status == "FINISHED"
         assert match.utc_date == datetime.fromisoformat(sample_match_data["utcDate"].replace('Z', '+00:00'))
 
-        assert match.score == sample_match_data["score"]
+        assert match.score.fullTime.home == sample_match_data["score"]["fullTime"]["home"]
+        assert match.score.fullTime.away == sample_match_data["score"]["fullTime"]["away"]
+        assert match.score.halfTime is not None
+        assert match.score.halfTime.home == sample_match_data["score"]["halfTime"]["home"]
+        assert match.score.halfTime.away == sample_match_data["score"]["halfTime"]["away"]
+        assert match.score.winner == sample_match_data["score"]["winner"]
+        assert match.score.duration == sample_match_data["score"]["duration"]
+        score_dict = match.score.model_dump()
+        assert "extraTime" in score_dict
+        assert score_dict["extraTime"]["home"] == 4
+        assert score_dict["extraTime"]["away"] == 3
 
         assert match.competition.name == sample_match_data["competition"]["name"]
         assert match.competition.code == sample_match_data["competition"]["code"]

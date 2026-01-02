@@ -4,10 +4,11 @@ Pytest configuration and shared fixtures.
 import pytest
 from unittest.mock import Mock, MagicMock
 from datetime import datetime
-from typing import Iterator
+from typing import Iterator, Optional
 
 from app.utils.time_provider import TimeProvider, DatetimeProvider
 from app.services.football_api import FootballAPIClient
+from app.schemas import CompetitionSchema, TeamSchema, MatchSchema, ScoreSchema, ScoreValues
 
 
 class MockTimeProvider(TimeProvider):
@@ -41,7 +42,7 @@ class MockTimeProvider(TimeProvider):
 class MockDatetimeProvider(DatetimeProvider):
     """Mock datetime provider for testing."""
     
-    def __init__(self, initial_datetime: datetime = None):
+    def __init__(self, initial_datetime: Optional[datetime] = None):
         self._current_datetime = initial_datetime or datetime(2024, 1, 15, 12, 0, 0)
     
     def now(self) -> datetime:
@@ -69,6 +70,10 @@ def mock_http_session() -> Mock:
     """Fixture providing a mock HTTP session."""
     return Mock()
 
+@pytest.fixture
+def mock_db():
+    """Provides a fresh mock database session for every test."""
+    return MagicMock()
 
 @pytest.fixture
 def sample_match_data() -> dict:
@@ -94,7 +99,16 @@ def sample_match_data() -> dict:
                 "home": 2,
                 "away": 1
             },
-        "winner": "HOME_TEAM"
+            "winner": "HOME_TEAM",
+            "duration": "REGULAR",
+            "halfTime": {
+                "home": 1,
+                "away": 0
+            },
+            "extraTime": {
+                "home": 4,
+                "away": 3
+            },
         },
         "competition": {
             "id": 2001,
@@ -117,3 +131,41 @@ def api_token() -> str:
     """Fixture providing a test API token."""
     return "test_api_token_12345"
 
+@pytest.fixture
+def sample_competition():
+    """Provides a consistent competition object for testing."""
+    return CompetitionSchema(
+        id=2021, 
+        name="Premier League", 
+        code="PL"
+    )
+
+@pytest.fixture
+def sample_team():
+    """Provides a consistent team object for testing."""
+    return TeamSchema(
+        id=64,
+        name="Liverpool FC",
+        short_name="Liverpool",
+        tla="LIV"
+    )
+
+
+@pytest.fixture
+def sample_match() -> MatchSchema:
+    """Provides a reusable MatchSchema for tests."""
+    home = TeamSchema(id=1, name="Home FC", short_name="Home", tla="HME")
+    away = TeamSchema(id=2, name="Away FC", short_name="Away", tla="AWY")
+    comp = CompetitionSchema(id=2001, name="Premier League", code="PL")
+    utc = datetime(2024, 1, 15, 15, 30, 0)
+    score = ScoreSchema(winner="HOME_TEAM", duration="REGULAR", fullTime=ScoreValues(home=2, away=1), halfTime=ScoreValues(home=1, away=0))
+
+    return MatchSchema(
+        match_id=123456,
+        status="FINISHED",
+        utc_date=utc,
+        home_team=home,
+        away_team=away,
+        competition=comp,
+        score=score
+    )

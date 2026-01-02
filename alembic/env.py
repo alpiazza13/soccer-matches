@@ -72,7 +72,7 @@ def run_migrations_online() -> None:
 
     env_path = Path(__file__).parent.parent / "backend" / ".env"
     load_dotenv(dotenv_path=env_path)
-    url = os.getenv("DATABASE_URL")
+    url = os.getenv("DATABASE_URL", "")
 
     connectable = create_engine(url, poolclass=pool.NullPool)
     with connectable.connect() as connection:

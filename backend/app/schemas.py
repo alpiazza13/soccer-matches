@@ -19,6 +19,22 @@ class CompetitionSchema(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class ScoreValues(BaseModel):
+    """Sub-structure for actual score numbers."""
+    home: Optional[int] = None
+    away: Optional[int] = None
+    model_config = ConfigDict(extra='allow')
+
+class ScoreSchema(BaseModel):
+    """Structured score data with 'extra=allow' for API flexibility."""
+    winner: Optional[str] = None
+    duration: str
+    fullTime: ScoreValues
+    halfTime: Optional[ScoreValues] = None
+    
+    # if the API adds new fields, Pydantic will still accept them in _extract_match_info and store them in the object
+    model_config = ConfigDict(extra='allow')
+
 class MatchSchema(BaseModel):
     """
     The master structure for a Match. 
@@ -30,6 +46,6 @@ class MatchSchema(BaseModel):
     home_team: TeamSchema
     away_team: TeamSchema
     competition: CompetitionSchema
-    score: Dict[str, Any]  # Keeps the complex score JSON intact
+    score: ScoreSchema
 
     model_config = ConfigDict(from_attributes=True)

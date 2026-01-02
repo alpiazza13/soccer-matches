@@ -93,7 +93,7 @@ class FootballAPIClient:
         competition: str, 
         date_from: Optional[str] = None, 
         date_to: Optional[str] = None
-    ) -> Tuple[List[Dict], List[Dict]]:
+    ) -> Tuple[List[MatchSchema], List[Dict]]:
         """
         Fetch matches for a given competition within a date range.
         
@@ -209,7 +209,7 @@ class FootballAPIClient:
         self, 
         date_from: Optional[str] = None, 
         date_to: Optional[str] = None
-    ) -> Tuple[List[Dict], List[Dict]]:
+    ) -> Tuple[List[MatchSchema], List[Dict]]:
         """
         Fetch matches from all supported competitions.
         

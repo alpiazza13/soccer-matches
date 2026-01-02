@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
-from sqlalchemy.orm import relationship, declarative_base
-from datetime import datetime
+from sqlalchemy.orm import relationship
+from datetime import datetime, timezone
 from app.database import Base
 
 class Team(Base):
@@ -27,6 +27,7 @@ class Match(Base):
     # Foreign Keys
     home_team_id = Column(Integer, ForeignKey("teams.id"))
     away_team_id = Column(Integer, ForeignKey("teams.id"))
+    competition_id = Column(Integer, ForeignKey("competitions.id"))
     
     # Scores stored as JSON for flexibility
     score = Column(JSON) # e.g., {"fullTime": {"home": 2, "away": 1}}
@@ -35,7 +36,7 @@ class Match(Base):
     home_team = relationship("Team", foreign_keys=[home_team_id], back_populates="matches_as_home")
     away_team = relationship("Team", foreign_keys=[away_team_id], back_populates="matches_as_away")
 
-    created_at = Column(DateTime, default=datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
 class Competition(Base):
     __tablename__ = "competitions"
