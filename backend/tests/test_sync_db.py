@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 from app.scripts.sync_db import get_sync_start_date, upsert_competition, upsert_team, upsert_match
 from app.models import Match
 from app.config import DEFAULT_SYNC_START_DATE, LOOKBACK_DAYS
-from app.schemas import TeamSchema, CompetitionSchema, MatchSchema, ScoreSchema, ScoreValues
 
 def test_get_sync_start_date_empty_db():
     mock_db = MagicMock()

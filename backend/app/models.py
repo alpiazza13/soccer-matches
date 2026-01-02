@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.database import Base
@@ -28,6 +28,7 @@ class Match(Base):
     home_team_id = Column(Integer, ForeignKey("teams.id"))
     away_team_id = Column(Integer, ForeignKey("teams.id"))
     competition_id = Column(Integer, ForeignKey("competitions.id"))
+    user_matches = relationship("UserMatch", back_populates="match")
     
     # Scores stored as JSON for flexibility
     score = Column(JSON) # e.g., {"fullTime": {"home": 2, "away": 1}}
@@ -43,7 +44,33 @@ class Competition(Base):
     id = Column(Integer, primary_key=True)
     external_id = Column(Integer, unique=True)
     name = Column(String)
-    code = Column(String) # e.g., 'CL'
+    code = Column(String)
 
     matches = relationship("Match", back_populates="competition")
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+
+    # This allows us to say `user.user_matches` to see their tracked games
+    user_matches = relationship("UserMatch", back_populates="user")
+
+class UserMatch(Base):
+    """
+    The 'Join' table that tracks if a specific user has finished a specific match.
+    """
+    __tablename__ = "user_matches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False)
+    
+    is_done = Column(Boolean, default=False)
+    notes = Column(String, nullable=True) # Optional: for future 'take notes' feature
+    last_updated = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+
+    user = relationship("User", back_populates="user_matches")

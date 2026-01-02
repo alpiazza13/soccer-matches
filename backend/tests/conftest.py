@@ -4,10 +4,9 @@ Pytest configuration and shared fixtures.
 import pytest
 from unittest.mock import Mock, MagicMock
 from datetime import datetime
-from typing import Iterator, Optional
+from typing import Optional
 
 from app.utils.time_provider import TimeProvider, DatetimeProvider
-from app.services.football_api import FootballAPIClient
 from app.schemas import CompetitionSchema, TeamSchema, MatchSchema, ScoreSchema, ScoreValues
 
 
