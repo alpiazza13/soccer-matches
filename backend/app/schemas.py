@@ -1,7 +1,8 @@
 from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional
 from app.models import Match, Team, Competition
+from pydantic import EmailStr
 
 class TeamSchema(BaseModel):
     """Data structure for Teams."""
@@ -50,3 +51,23 @@ class MatchSchema(BaseModel):
     score: ScoreSchema
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: EmailStr
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserMatchResponse(BaseModel):
+    user_id: int
+    match_id: int
+    is_done: bool
+
+    model_config = ConfigDict()

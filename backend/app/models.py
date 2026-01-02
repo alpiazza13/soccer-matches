@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, mapped_column, Mapped
 from datetime import datetime, timezone
 from app.database import Base
 
@@ -69,7 +69,7 @@ class UserMatch(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=False)
     
-    is_done = Column(Boolean, default=False)
+    is_done: Mapped[bool] = mapped_column(default=False)
     notes = Column(String, nullable=True) # Optional: for future 'take notes' feature
     last_updated = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 

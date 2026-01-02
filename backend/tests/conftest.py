@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import Mock, MagicMock
 from datetime import datetime
 from typing import Optional
+import itertools
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
@@ -14,7 +15,7 @@ from app.database import Base
 from app.models import Team, Match, Competition
 
 from app.utils.time_provider import TimeProvider, DatetimeProvider
-from app.schemas import CompetitionSchema, TeamSchema, MatchSchema, ScoreSchema, ScoreValues
+from app.schemas import CompetitionSchema, TeamSchema, MatchSchema, ScoreSchema, ScoreValues, UserCreate
 
 
 class MockTimeProvider(TimeProvider):
@@ -136,6 +137,21 @@ def sample_api_response(sample_match_data) -> dict:
 def api_token() -> str:
     """Fixture providing a test API token."""
     return "test_api_token_12345"
+
+
+@pytest.fixture
+def user_payload():
+    """Factory fixture that returns a user payload dict using `UserCreate`.
+
+    Call like `payload = user_payload()` or `user_payload(email="x@x.com")`.
+    """
+    counter = itertools.count(1)
+
+    def _make(email: Optional[str] = None, password: str = "pw"):
+        i = next(counter)
+        return UserCreate(email=email or f"user{i}@example.com", password=password).model_dump()
+
+    return _make
 
 @pytest.fixture
 def sample_competition():

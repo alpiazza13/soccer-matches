@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta
 from typing import Optional, List
+from typing import Optional, List, cast
 import os
 from contextlib import asynccontextmanager
 
@@ -10,9 +11,14 @@ from sqlalchemy.orm import Session
 from app.services.football_api import FootballAPIClient
 from app.dependencies import get_football_api_client
 from app.database import SessionLocal, Base, engine
-from app.models import Match as MatchModel
-from app.schemas import MatchSchema, TeamSchema, CompetitionSchema, ScoreSchema
-
+from app.models import Match as MatchModel, User as UserModel, UserMatch as UserMatchModel
+from app.schemas import (
+    MatchSchema,
+    UserCreate,
+    UserResponse,
+    UserMatchResponse,
+)
+from sqlalchemy.exc import IntegrityError
 
 def get_db():
     """Dependency that provides a SQLAlchemy session and closes it after use."""
@@ -21,6 +27,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 
 @asynccontextmanager
@@ -131,6 +138,49 @@ def read_matches(db: Session = Depends(get_db)):
     except Exception as e:
         print(f"Error reading matches from DB: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/users", response_model=UserResponse)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    """Create a new user. Password is stored as a simple hash placeholder."""
+    existing = db.query(UserModel).filter(UserModel.email == user.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    hashed = f"hashed_{user.password}"
+    u = UserModel(email=user.email, hashed_password=hashed)
+    db.add(u)
+    try:
+        db.commit()
+        db.refresh(u)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    return UserResponse.model_validate(u)
+
+
+@app.post("/matches/{match_id}/done", response_model=UserMatchResponse)
+def mark_match_done(match_id: int, user_id: int, db: Session = Depends(get_db)):
+    """Mark a match as done for a given user. `match_id` is the external_id."""
+    match = db.query(MatchModel).filter(MatchModel.external_id == match_id).first()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    # ensure user exists
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_match = db.query(UserMatchModel).filter(UserMatchModel.user_id == user_id, UserMatchModel.match_id == match.id).first()
+    if user_match:
+           user_match.is_done = True
+    else:
+        user_match = UserMatchModel(user_id=user_id, match_id=match.id, is_done=True)
+        db.add(user_match)
+
+    db.commit()
+    return UserMatchResponse(user_id=user_id, match_id=match_id, is_done=True)
 
 
 if __name__ == "__main__":
