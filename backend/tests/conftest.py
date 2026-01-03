@@ -155,7 +155,7 @@ def user_payload():
 
     return _make
 
-'''
+
 @pytest.fixture
 def client_with_db(db_session):
     """TestClient that uses the transactional `db_session` via dependency override."""
@@ -165,7 +165,7 @@ def client_with_db(db_session):
             yield client
     finally:
         app.dependency_overrides.pop(get_db, None)
-'''
+
 
 @pytest.fixture
 def sample_competition():

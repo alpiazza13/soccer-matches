@@ -60,31 +60,20 @@ class TestHealthEndpoint:
         assert data["status"] == "healthy"
 
 
-def test_matches_endpoint_empty():
+def test_matches_endpoint_empty(client_with_db):
     """GET /matches should return an empty list when DB has no matches."""
-    mock_db = MagicMock()
-    mock_db.query.return_value.all.return_value = []
-    app.dependency_overrides[get_db] = lambda: mock_db
-    try:
-        with TestClient(app) as client_local:
-            res = client_local.get("/matches")
-            assert res.status_code == 200
-            assert res.json() == []
-    finally:
-        app.dependency_overrides.pop(get_db, None)
+    res = client_with_db.get("/matches")
+    assert res.status_code == 200
+    assert res.json() == []
 
 
-def test_matches_endpoint_returns_match(db_session, persisted_match):
+def test_matches_endpoint_returns_match(client_with_db, persisted_match):
     """GET /matches should return serialized matches from DB using MatchSchema."""
-    app.dependency_overrides[get_db] = lambda: db_session
-    try:
-        with TestClient(app) as client_local:
-            res = client_local.get("/matches")
-            assert res.status_code == 200
-            body = res.json()
-            assert isinstance(body, list) and len(body) == 1
-            expected = MatchSchema.model_validate(persisted_match).model_dump(by_alias=True, mode='json')
-            assert body[0] == expected
-    finally:
-        app.dependency_overrides.pop(get_db, None)
+    with TestClient(app) as client_local:
+        res = client_local.get("/matches")
+        assert res.status_code == 200
+        body = res.json()
+        assert isinstance(body, list) and len(body) == 1
+        expected = MatchSchema.model_validate(persisted_match).model_dump(by_alias=True, mode='json')
+        assert body[0] == expected
 
