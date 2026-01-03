@@ -1,8 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta
-from typing import Optional, List
-from typing import Optional, List, cast
+from typing import List
 import os
 from contextlib import asynccontextmanager
 

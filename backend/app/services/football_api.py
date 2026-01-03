@@ -1,7 +1,7 @@
 import os
 import requests
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Tuple
 from http.client import responses
 
 from app.utils.time_provider import TimeProvider, SystemTimeProvider, DatetimeProvider, SystemDatetimeProvider
@@ -30,10 +30,10 @@ class FootballAPIClient:
     
     def __init__(
         self, 
-        api_token: Optional[str] = None,
-        http_session: Optional[requests.Session] = None,
-        time_provider: Optional[TimeProvider] = None,
-        datetime_provider: Optional[DatetimeProvider] = None
+        api_token: str | None = None,
+        http_session: requests.Session | None = None,
+        time_provider: TimeProvider | None = None,
+        datetime_provider: DatetimeProvider | None = None
     ):
         """
         Initialize the Football API client.
@@ -91,8 +91,8 @@ class FootballAPIClient:
     def get_matches(
         self, 
         competition: str, 
-        date_from: Optional[str] = None, 
-        date_to: Optional[str] = None
+        date_from: str | None = None, 
+        date_to: str | None = None
     ) -> Tuple[List[MatchSchema], List[Dict]]:
         """
         Fetch matches for a given competition within a date range.
@@ -207,8 +207,8 @@ class FootballAPIClient:
     
     def fetch_all_matches(
         self, 
-        date_from: Optional[str] = None, 
-        date_to: Optional[str] = None
+        date_from: str | None = None, 
+        date_to: str | None = None
     ) -> Tuple[List[MatchSchema], List[Dict]]:
         """
         Fetch matches from all supported competitions.

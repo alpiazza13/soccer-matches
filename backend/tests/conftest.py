@@ -5,7 +5,6 @@ import os
 import pytest
 from unittest.mock import Mock, MagicMock
 from datetime import datetime
-from typing import Optional
 import itertools
 
 from sqlalchemy import create_engine
@@ -51,7 +50,7 @@ class MockTimeProvider(TimeProvider):
 class MockDatetimeProvider(DatetimeProvider):
     """Mock datetime provider for testing."""
     
-    def __init__(self, initial_datetime: Optional[datetime] = None):
+    def __init__(self, initial_datetime: datetime | None = None):
         self._current_datetime = initial_datetime or datetime(2024, 1, 15, 12, 0, 0)
     
     def now(self) -> datetime:
@@ -149,7 +148,7 @@ def user_payload():
     """
     counter = itertools.count(1)
 
-    def _make(email: Optional[str] = None, password: str = "pw"):
+    def _make(email: str | None = None, password: str = "pw"):
         i = next(counter)
         return UserCreate(email=email or f"user{i}@example.com", password=password).model_dump()
 

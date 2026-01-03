@@ -1,6 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
-from typing import Optional
 from app.models import Match, Team, Competition
 from pydantic import EmailStr
 
@@ -8,8 +7,8 @@ class TeamSchema(BaseModel):
     """Data structure for Teams."""
     id: int = Field(alias=Team.external_id.key)
     name: str
-    short_name: Optional[str] = None
-    tla: Optional[str] = None
+    short_name: str| None = None
+    tla: str| None = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -23,17 +22,17 @@ class CompetitionSchema(BaseModel):
 
 class ScoreValues(BaseModel):
     """Sub-structure for actual score numbers."""
-    home: Optional[int] = None
-    away: Optional[int] = None
+    home: int | None = None
+    away: int | None = None
     model_config = ConfigDict(from_attributes=True, extra='allow')
 
 class ScoreSchema(BaseModel):
     """Structured score data with 'extra=allow' for API flexibility."""
-    winner: Optional[str] = None
+    winner: str | None = None
     duration: str
     fullTime: ScoreValues
-    halfTime: Optional[ScoreValues] = None
-    
+    halfTime: ScoreValues | None = None
+
     # if the API adds new fields, Pydantic will still accept them in _extract_match_info and store them in the object
     model_config = ConfigDict(from_attributes=True, extra='allow')
 
