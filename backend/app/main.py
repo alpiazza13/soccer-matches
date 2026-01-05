@@ -124,7 +124,12 @@ async def test_fetch(
 
 
 @app.get("/matches", response_model=List[MatchSchema])
-def read_matches(user_id: int, db: Session = Depends(get_db)):
+def read_matches(user_id: int, 
+                hide_done: bool = False, 
+                limit: int = 20, 
+                offset: int = 0, 
+                db: Session = Depends(get_db)
+    ):
     """
     Return all matches persisted in the local database.
     Fetch all matches and check if they are 'done' for a specific user using a single efficient SQL JOIN.
@@ -137,6 +142,13 @@ def read_matches(user_id: int, db: Session = Depends(get_db)):
                 (UserMatchModel.match_id == MatchModel.id) & (UserMatchModel.user_id == user_id)
             )
         )
+
+        if hide_done:
+            query = query.filter(
+                (UserMatchModel.is_done == False) | (UserMatchModel.is_done == None)
+            )
+
+        query = query.order_by(MatchModel.utc_date.desc()).offset(offset).limit(limit)
 
         results = []
         for match_obj, is_done_flag in query.all():
@@ -195,4 +207,4 @@ def mark_match_done(match_id: int, user_id: int, db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
