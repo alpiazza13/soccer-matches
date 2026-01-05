@@ -77,3 +77,16 @@ def test_is_done_isolation_between_users(client_with_db, persisted_match, user_p
     # 4. Check User B's list (Should still be False)
     res_b = client_with_db.get("/matches", params={"user_id": user_b_id})
     assert res_b.json()[0]["is_done"] is False
+
+def test_get_me_success(client_with_db, user_payload):
+    payload = user_payload(email="me@example.com")
+    create_res = client_with_db.post("/users", json=payload)
+    user_id = create_res.json()["id"]
+
+    res = client_with_db.get("/users/me", params={"user_id": user_id})
+    assert res.status_code == 200
+    assert res.json()["email"] == "me@example.com"
+
+def test_get_me_not_found(client_with_db):
+    res = client_with_db.get("/users/me", params={"user_id": 99999})
+    assert res.status_code == 404

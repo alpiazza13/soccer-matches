@@ -182,6 +182,20 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     return UserResponse.model_validate(u)
 
 
+@app.get("/users/me", response_model=UserResponse)
+def read_user_me(user_id: int, db: Session = Depends(get_db)):
+    """
+    Fetch the current user's profile. Frontend uses this to verify if the saved user_id is still valid.
+    """
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=404, 
+            detail="User not found. Please log in again."
+        )
+    return user
+
+
 @app.post("/matches/{match_id}/done", response_model=UserMatchResponse)
 def mark_match_done(match_id: int, user_id: int, db: Session = Depends(get_db)):
     """Mark a match as done for a given user. `match_id` is the external_id."""
