@@ -48,6 +48,7 @@ class MatchSchema(BaseModel):
     away_team: TeamSchema
     competition: CompetitionSchema
     score: ScoreSchema
+    is_done: bool = False 
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 

@@ -6,6 +6,7 @@ import os
 from contextlib import asynccontextmanager
 
 from sqlalchemy.orm import Session
+from sqlalchemy import outerjoin
 
 from app.services.football_api import FootballAPIClient
 from app.dependencies import get_football_api_client
@@ -123,17 +124,27 @@ async def test_fetch(
 
 
 @app.get("/matches", response_model=List[MatchSchema])
-def read_matches(db: Session = Depends(get_db)):
-    """Return all matches persisted in the local database.
-
-    Uses Pydantic `from_attributes` (ORM) mode to construct `MatchSchema`
-    directly from SQLAlchemy model instances via `model_validate`.
+def read_matches(user_id: int, db: Session = Depends(get_db)):
+    """
+    Return all matches persisted in the local database.
+    Fetch all matches and check if they are 'done' for a specific user using a single efficient SQL JOIN.
     """
     try:
-        db_matches = db.query(MatchModel).all()
-        matches = [MatchSchema.model_validate(m) for m in db_matches]
-        print(f"Fetched {len(matches)} matches from DB")
-        return matches
+        query = (
+            db.query(MatchModel, UserMatchModel.is_done)
+            .outerjoin(
+                UserMatchModel, 
+                (UserMatchModel.match_id == MatchModel.id) & (UserMatchModel.user_id == user_id)
+            )
+        )
+
+        results = []
+        for match_obj, is_done_flag in query.all():
+            schema_data = MatchSchema.model_validate(match_obj)
+            schema_data.is_done = bool(is_done_flag)
+            results.append(schema_data)
+
+        return results
     except Exception as e:
         print(f"Error reading matches from DB: {e}")
         raise HTTPException(status_code=500, detail=str(e))

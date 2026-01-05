@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from app.main import app, get_db
 from app.dependencies import get_football_api_client
 from app.services.football_api import FootballAPIClient
-from tests.conftest import MockTimeProvider, MockDatetimeProvider
+from tests.conftest import MockTimeProvider, MockDatetimeProvider, client_with_db
 from app.schemas import MatchSchema
 
 
@@ -62,18 +62,37 @@ class TestHealthEndpoint:
 
 def test_matches_endpoint_empty(client_with_db):
     """GET /matches should return an empty list when DB has no matches."""
-    res = client_with_db.get("/matches")
+    res = client_with_db.get("/matches", params={"user_id": 1})
     assert res.status_code == 200
     assert res.json() == []
 
 
 def test_matches_endpoint_returns_match(client_with_db, persisted_match):
     """GET /matches should return serialized matches from DB using MatchSchema."""
-    with TestClient(app) as client_local:
-        res = client_local.get("/matches")
-        assert res.status_code == 200
-        body = res.json()
-        assert isinstance(body, list) and len(body) == 1
-        expected = MatchSchema.model_validate(persisted_match).model_dump(by_alias=True, mode='json')
-        assert body[0] == expected
+    res = client_with_db.get("/matches", params={"user_id": 1})
+    assert res.status_code == 200
+    body = res.json()
+    assert isinstance(body, list) and len(body) == 1
+    
+    # Manually add the expected default is_done=False to comparison
+    expected = MatchSchema.model_validate(persisted_match).model_dump(by_alias=True, mode='json')
+    expected["is_done"] = False 
+    assert body[0] == expected
 
+def test_read_matches_with_is_done_status(client_with_db, persisted_match, user_payload):
+    """Verify that the match list correctly reflects the is_done status for a specific user."""
+    # 1. Create a user
+    payload = user_payload(email="checker@example.com")
+    user_res = client_with_db.post("/users", json=payload)
+    user_id = user_res.json()["id"]
+
+    # 2. Check matches initially (is_done should be False)
+    res_before = client_with_db.get("/matches", params={"user_id": user_id})
+    assert res_before.json()[0]["is_done"] is False
+
+    # 3. Mark that match as done
+    client_with_db.post(f"/matches/{persisted_match.external_id}/done", params={"user_id": user_id})
+
+    # 4. Check matches again (is_done should now be True)
+    res_after = client_with_db.get("/matches", params={"user_id": user_id})
+    assert res_after.json()[0]["is_done"] is True
