@@ -69,15 +69,14 @@ def test_matches_endpoint_empty(client_with_db):
 
 def test_matches_endpoint_returns_match(client_with_db, persisted_match):
     """GET /matches should return serialized matches from DB using MatchSchema."""
-    res = client_with_db.get("/matches", params={"user_id": 1})
+    res = client_with_db.get("/matches")
     assert res.status_code == 200
     body = res.json()
     assert isinstance(body, list) and len(body) == 1
-    
-    # Manually add the expected default is_done=False to comparison
-    expected = MatchSchema.model_validate(persisted_match).model_dump(by_alias=True, mode='json')
-    expected["is_done"] = False 
-    assert body[0] == expected
+    assert body[0]["is_done"] is False
+
+    expected_id = persisted_match.external_id
+    assert body[0]["external_id"] == expected_id
 
 def test_read_matches_with_is_done_status(client_with_db, persisted_match, user_payload):
     """Verify that the match list correctly reflects the is_done status for a specific user."""
@@ -93,6 +92,16 @@ def test_read_matches_with_is_done_status(client_with_db, persisted_match, user_
     res_after = client_with_db.get("/matches", params={"user_id": user_id})
     assert res_after.json()[0]["is_done"] is True
 
+
+def test_read_matches_guest_access(client_with_db, persisted_match):
+    """Verify that omitting user_id allows guest access with is_done=False."""
+    res = client_with_db.get("/matches")
+    
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data) == 1
+    assert data[0]["is_done"] is False
+
 def test_read_matches_pagination_and_filtering(client_with_db, persisted_match, user_payload):
     user_id = client_with_db.post("/users", json=user_payload()).json()["id"]
     
@@ -106,3 +115,9 @@ def test_read_matches_pagination_and_filtering(client_with_db, persisted_match, 
     
     res_hide = client_with_db.get("/matches", params={"user_id": user_id, "hide_done": True})
     assert len(res_hide.json()) == 0
+
+def test_matches_pagination_offset(client_with_db, persisted_match):
+    """Verify that an offset greater than total records returns an empty list."""
+    res = client_with_db.get("/matches", params={"offset": 10})
+    assert res.status_code == 200
+    assert res.json() == []

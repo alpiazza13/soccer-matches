@@ -78,6 +78,12 @@ def test_is_done_isolation_between_users(client_with_db, persisted_match, user_p
     res_b = client_with_db.get("/matches", params={"user_id": user_b_id})
     assert res_b.json()[0]["is_done"] is False
 
+
+def test_mark_match_done_fails_for_guest(client_with_db, persisted_match):
+    """Guests should not be able to mark matches as done."""
+    res = client_with_db.post(f"/matches/{persisted_match.external_id}/done")
+    assert res.status_code == 422
+
 def test_get_me_success(client_with_db, user_payload):
     payload = user_payload(email="me@example.com")
     create_res = client_with_db.post("/users", json=payload)

@@ -6,7 +6,7 @@ import os
 from contextlib import asynccontextmanager
 
 from sqlalchemy.orm import Session
-from sqlalchemy import outerjoin
+from sqlalchemy import outerjoin, literal
 
 from app.services.football_api import FootballAPIClient
 from app.dependencies import get_football_api_client
@@ -124,7 +124,7 @@ async def test_fetch(
 
 
 @app.get("/matches", response_model=List[MatchSchema])
-def read_matches(user_id: int, 
+def read_matches(user_id: int | None = None, 
                 hide_done: bool = False, 
                 limit: int = 20, 
                 offset: int = 0, 
@@ -135,15 +135,17 @@ def read_matches(user_id: int,
     Fetch all matches and check if they are 'done' for a specific user using a single efficient SQL JOIN.
     """
     try:
-        query = (
-            db.query(MatchModel, UserMatchModel.is_done)
-            .outerjoin(
-                UserMatchModel, 
-                (UserMatchModel.match_id == MatchModel.id) & (UserMatchModel.user_id == user_id)
-            )
-        )
+        query = db.query(MatchModel, UserMatchModel.is_done)
 
-        if hide_done:
+        if user_id:
+            query = query.outerjoin(
+                        UserMatchModel, 
+                        (UserMatchModel.match_id == MatchModel.id) & (UserMatchModel.user_id == user_id)
+        )
+        else:
+            query = query.outerjoin(UserMatchModel, literal(False))
+
+        if hide_done and user_id:
             query = query.filter(
                 (UserMatchModel.is_done == False) | (UserMatchModel.is_done == None)
             )
