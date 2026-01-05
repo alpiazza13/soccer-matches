@@ -33,9 +33,6 @@ venv.bak/
 # PyCharm
 .idea/
 
-# VS Code
-.vscode/
-
 # Cursor
 .cursor/
 
