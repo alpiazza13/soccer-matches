@@ -1,0 +1,1 @@
+1. Run 'npm run dev' to start the server and go to http://localhost:3000/ to view the page
