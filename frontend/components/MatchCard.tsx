@@ -29,11 +29,11 @@ export default function MatchCard({ match }: { match: Match }) {
       </div>
 
       <div className="flex-1 flex items-center justify-center gap-4">
-        <span className="flex-1 text-right">{match.home_team.name}</span>
+        <span className="flex-1 text-right">{match.home_team.short_name}</span>
         <span className="font-mono bg-slate-100 px-2 rounded">
             {match.score?.fullTime?.home ?? 0} - {match.score?.fullTime?.away ?? 0}
         </span>
-        <span className="flex-1 text-left">{match.away_team.name}</span>
+        <span className="flex-1 text-left">{match.away_team.short_name}</span>
       </div>
 
       <div className="w-32 flex items-center justify-end gap-3">

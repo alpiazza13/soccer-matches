@@ -11,6 +11,7 @@ export interface Team {
   id: number;
   external_id: number;
   name: string;
+  short_name: string;
   tla: string;
   crest: string | null;
 }
