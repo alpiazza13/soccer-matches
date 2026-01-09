@@ -28,7 +28,7 @@ export default function Home() {
         if (currentOffset === 0) return newData;
 
         // If we are appending, filter out matches that already exist in 'prev'
-        const existingIds = new Set(prev.map(m => m.id));
+        const existingIds = new Set(prev.map(m => m.external_id));
         const uniqueNewData = newData.filter((m: Match) => !existingIds.has(m.id));
         
         return [...prev, ...uniqueNewData];
@@ -67,6 +67,7 @@ export default function Home() {
     fetchMatches(nextOffset);
   };
 
+  console.log("Match IDs in list:", matches.map(m => m.external_id));
   return (
       <main className="max-w-4xl mx-auto p-8 bg-slate-50 min-h-screen">
         <div className="flex justify-between items-end mb-8">
@@ -84,7 +85,7 @@ export default function Home() {
         
         <div className="grid gap-3 mb-8">
           {matches.map((match) => (
-            <MatchCard key={match.id} match={match} />
+            <MatchCard key={match.external_id} match={match} />
           ))}
         </div>
 
