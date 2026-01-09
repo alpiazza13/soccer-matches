@@ -206,8 +206,8 @@ def read_user_me(user_id: int, db: Session = Depends(get_db)):
     return user
 
 
-@app.post("/matches/{match_id}/done", response_model=UserMatchResponse)
-def mark_match_done(match_id: int, user_id: int, db: Session = Depends(get_db)):
+@app.post("/matches/{match_id}/status", response_model=UserMatchResponse)
+def toggle_match_done(match_id: int, user_id: int, is_done: bool, db: Session = Depends(get_db)):
     """Mark a match as done for a given user. `match_id` is the external_id."""
     match = db.query(MatchModel).filter(MatchModel.external_id == match_id).first()
     if not match:
@@ -220,7 +220,7 @@ def mark_match_done(match_id: int, user_id: int, db: Session = Depends(get_db)):
 
     user_match = db.query(UserMatchModel).filter(UserMatchModel.user_id == user_id, UserMatchModel.match_id == match.id).first()
     if user_match:
-           user_match.is_done = True
+           user_match.is_done = is_done
     else:
         user_match = UserMatchModel(user_id=user_id, match_id=match.id, is_done=True)
         db.add(user_match)

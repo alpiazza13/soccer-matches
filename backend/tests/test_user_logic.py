@@ -24,7 +24,7 @@ def test_create_user_duplicate_email(client_with_db, user_payload):
         assert r2.status_code == 400
 
 
-def test_mark_match_done_success(client_with_db, persisted_match, user_payload):
+def test_toggle_match_done_success(client_with_db, persisted_match, user_payload):
         # create user
         payload = user_payload(email="marker@example.com")
         r = client_with_db.post("/users", json=payload)
@@ -32,13 +32,18 @@ def test_mark_match_done_success(client_with_db, persisted_match, user_payload):
         user = UserResponse.model_validate(r.json())
 
         # mark match done
-        res = client_with_db.post(f"/matches/{persisted_match.external_id}/done", params={"user_id": user.id})
+        res = client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"user_id": user.id, "is_done": True})
         assert res.status_code == 200
         body = res.json()
         um = UserMatchResponse.model_validate(body)
         assert um.user_id == user.id
         assert um.match_id == persisted_match.external_id
+
+        # mark match not done
+        res = client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"user_id": user.id, "is_done": False})
+        assert res.status_code == 200
         assert um.is_done is True
+
 
 
 def test_mark_match_done_missing_match(client_with_db, user_payload):
@@ -66,8 +71,8 @@ def test_is_done_isolation_between_users(client_with_db, persisted_match, user_p
 
     # 2. User A marks the match as done
     client_with_db.post(
-        f"/matches/{persisted_match.external_id}/done", 
-        params={"user_id": user_a_id}
+        f"/matches/{persisted_match.external_id}/status", 
+        params={"user_id": user_a_id, "is_done": True}
     )
 
     # 3. Check User A's list (Should be True)
@@ -81,7 +86,7 @@ def test_is_done_isolation_between_users(client_with_db, persisted_match, user_p
 
 def test_mark_match_done_fails_for_guest(client_with_db, persisted_match):
     """Guests should not be able to mark matches as done."""
-    res = client_with_db.post(f"/matches/{persisted_match.external_id}/done")
+    res = client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"is_done": True})
     assert res.status_code == 422
 
 def test_get_me_success(client_with_db, user_payload):

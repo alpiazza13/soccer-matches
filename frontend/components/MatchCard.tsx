@@ -13,7 +13,7 @@ export default function MatchCard({ match }: { match: Match }) {
     try {
       // hardcoding user_id=9 for now
       // match.external_id is used here as per main.py logic
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/matches/${match.external_id}/done?user_id=9`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/matches/${match.external_id}/status?user_id=9&is_done=${newStatus}`, {
         method: 'POST',
       });
     } catch (error) {

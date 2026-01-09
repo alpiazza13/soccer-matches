@@ -7,11 +7,9 @@ from unittest.mock import Mock, MagicMock
 from datetime import datetime
 from types import SimpleNamespace
 
-from app.main import app, get_db
-from app.dependencies import get_football_api_client
+from app.main import app
 from app.services.football_api import FootballAPIClient
-from tests.conftest import MockTimeProvider, MockDatetimeProvider, client_with_db
-from app.schemas import MatchSchema
+from tests.conftest import MockTimeProvider, MockDatetimeProvider
 
 
 @pytest.fixture
@@ -87,7 +85,7 @@ def test_read_matches_with_is_done_status(client_with_db, persisted_match, user_
     assert res_before.json()[0]["is_done"] is False
 
     # Mark  match as done
-    client_with_db.post(f"/matches/{persisted_match.external_id}/done", params={"user_id": user_id})
+    client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"user_id": user_id, "is_done": True})
 
     res_after = client_with_db.get("/matches", params={"user_id": user_id})
     assert res_after.json()[0]["is_done"] is True
@@ -108,7 +106,7 @@ def test_read_matches_pagination_and_filtering(client_with_db, persisted_match, 
     res_limit = client_with_db.get("/matches", params={"user_id": user_id, "limit": 0})
     assert len(res_limit.json()) == 0
 
-    client_with_db.post(f"/matches/{persisted_match.external_id}/done", params={"user_id": user_id})
+    client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"user_id": user_id, "is_done": True})
     
     res_show = client_with_db.get("/matches", params={"user_id": user_id, "hide_done": False})
     assert len(res_show.json()) == 1
