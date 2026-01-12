@@ -79,15 +79,15 @@ def test_matches_endpoint_returns_match(client_with_db, persisted_match):
 def test_read_matches_with_is_done_status(client_with_db, persisted_match, user_payload):
     """Verify that the match list correctly reflects the is_done status for a specific user."""
     user_res = client_with_db.post("/users", json=user_payload())
-    user_id = user_res.json()["id"]
+    user_email = user_res.json()["email"]
 
-    res_before = client_with_db.get("/matches", params={"user_id": user_id})
+    res_before = client_with_db.get("/matches", params={"email": user_email})
     assert res_before.json()[0]["is_done"] is False
 
     # Mark  match as done
-    client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"user_id": user_id, "is_done": True})
+    client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"email": user_email, "is_done": True})
 
-    res_after = client_with_db.get("/matches", params={"user_id": user_id})
+    res_after = client_with_db.get("/matches", params={"email": user_email})
     assert res_after.json()[0]["is_done"] is True
 
 
@@ -101,17 +101,17 @@ def test_read_matches_guest_access(client_with_db, persisted_match):
     assert data[0]["is_done"] is False
 
 def test_read_matches_pagination_and_filtering(client_with_db, persisted_match, user_payload):
-    user_id = client_with_db.post("/users", json=user_payload()).json()["id"]
+    user_email = client_with_db.post("/users", json=user_payload()).json()["email"]
     
-    res_limit = client_with_db.get("/matches", params={"user_id": user_id, "limit": 0})
+    res_limit = client_with_db.get("/matches", params={"email": user_email, "limit": 0})
     assert len(res_limit.json()) == 0
 
-    client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"user_id": user_id, "is_done": True})
-    
-    res_show = client_with_db.get("/matches", params={"user_id": user_id, "hide_done": False})
+    client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"email": user_email, "is_done": True})
+
+    res_show = client_with_db.get("/matches", params={"email": user_email, "hide_done": False})
     assert len(res_show.json()) == 1
-    
-    res_hide = client_with_db.get("/matches", params={"user_id": user_id, "hide_done": True})
+
+    res_hide = client_with_db.get("/matches", params={"email": user_email, "hide_done": True})
     assert len(res_hide.json()) == 0
 
 def test_matches_pagination_offset(client_with_db, persisted_match):

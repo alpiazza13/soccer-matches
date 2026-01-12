@@ -19,7 +19,7 @@ export default function Home() {
     try {
       // Fetching with limit and offset from your FastAPI parameters
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/matches?user_id=${userId}&limit=${LIMIT}&offset=${currentOffset}`
+        `${process.env.NEXT_PUBLIC_API_URL}/matches?email=${userId}&limit=${LIMIT}&offset=${currentOffset}`
       );
       const newData = await res.json();
       
@@ -73,7 +73,7 @@ export default function Home() {
         <div className="flex justify-between items-end mb-8">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Matches</h1>
-            <p className="text-sm text-slate-500">Tracking for User #{userId}</p>
+            <p className="text-sm text-slate-500">Loggged in as {userId}</p>
           </div>
           <button 
             onClick={logout} 

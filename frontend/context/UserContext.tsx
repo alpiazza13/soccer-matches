@@ -3,22 +3,22 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface UserContextType {
-  userId: number | null;
-  setUserId: (id: number) => void;
+  userId: string | null;
+  setUserId: (id: string) => void;
   logout: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [userId, setUserId] = useState<number | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const savedId = localStorage.getItem('soccer_user_id');
-    if (savedId) setUserId(parseInt(savedId));
+    if (savedId) setUserId(savedId);
   }, []);
 
-  const handleSetUserId = (id: number) => {
+  const handleSetUserId = (id: string) => {
     setUserId(id);
     localStorage.setItem('soccer_user_id', id.toString());
   };

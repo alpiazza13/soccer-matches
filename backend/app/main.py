@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, cast
 import os
 from contextlib import asynccontextmanager
 
@@ -132,7 +132,7 @@ async def test_fetch(
 
 
 @app.get("/matches", response_model=List[MatchSchema])
-def read_matches(user_id: int | None = None, 
+def read_matches(email: str | None = None, 
                 hide_done: bool = False, 
                 limit: int = 20, 
                 offset: int = 0, 
@@ -143,13 +143,19 @@ def read_matches(user_id: int | None = None,
     Fetch all matches and check if they are 'done' for a specific user using a single efficient SQL JOIN.
     """
     try:
+        user_id: int | None = None
+        if email:
+            user = db.query(UserModel).filter(UserModel.email == email).first()
+            if user:
+                user_id = cast(int, user.id)
+        
         query = db.query(MatchModel, UserMatchModel.is_done)
-
+        
         if user_id:
-            query = query.outerjoin(
-                        UserMatchModel, 
-                        (UserMatchModel.match_id == MatchModel.id) & (UserMatchModel.user_id == user_id)
-        )
+            query = query.outerjoin(UserMatchModel, 
+                                    (MatchModel.id == UserMatchModel.match_id) & 
+                                    (UserMatchModel.user_id == user_id)
+            )
         else:
             query = query.outerjoin(UserMatchModel, literal(False))
 
@@ -193,11 +199,11 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/users/me", response_model=UserResponse)
-def read_user_me(user_id: int, db: Session = Depends(get_db)):
+def read_user_me(email: str, db: Session = Depends(get_db)):
     """
-    Fetch the current user's profile. Frontend uses this to verify if the saved user_id is still valid.
+    Fetch the current user's profile. Frontend uses this to verify if the saved email is still valid.
     """
-    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    user = db.query(UserModel).filter(UserModel.email == email).first()
     if not user:
         raise HTTPException(
             status_code=404, 
@@ -207,26 +213,26 @@ def read_user_me(user_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/matches/{match_id}/status", response_model=UserMatchResponse)
-def toggle_match_done(match_id: int, user_id: int, is_done: bool, db: Session = Depends(get_db)):
+def toggle_match_done(match_id: int, email: str, is_done: bool, db: Session = Depends(get_db)):
     """Mark a match as done for a given user. `match_id` is the external_id."""
     match = db.query(MatchModel).filter(MatchModel.external_id == match_id).first()
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
 
     # ensure user exists
-    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    user = db.query(UserModel).filter(UserModel.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user_match = db.query(UserMatchModel).filter(UserMatchModel.user_id == user_id, UserMatchModel.match_id == match.id).first()
+    user_match = db.query(UserMatchModel).filter(UserMatchModel.user_id == user.id, UserMatchModel.match_id == match.id).first()
     if user_match:
            user_match.is_done = is_done
     else:
-        user_match = UserMatchModel(user_id=user_id, match_id=match.id, is_done=True)
+        user_match = UserMatchModel(user_id=user.id, match_id=match.id, is_done=True)
         db.add(user_match)
 
     db.commit()
-    return UserMatchResponse(user_id=user_id, match_id=match_id, is_done=True)
+    return UserMatchResponse(user_id=cast(int, user.id), match_id=match_id, is_done=True)
 
 
 if __name__ == "__main__":

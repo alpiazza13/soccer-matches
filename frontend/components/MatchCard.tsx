@@ -15,7 +15,7 @@ export default function MatchCard({ match }: { match: Match }) {
 
     try {
       // match.external_id is used here as per main.py logic
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/matches/${match.external_id}/status?user_id=${userId}&is_done=${newStatus}`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/matches/${match.external_id}/status?email=${userId}&is_done=${newStatus}`, {
         method: 'POST',
       });
     } catch (error) {
