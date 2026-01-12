@@ -7,19 +7,19 @@ import { Match } from '../types/matches';
 import { useUser } from '../context/UserContext';
 
 export default function Home() {
-  const { userId, logout } = useUser();
+  const { userEmail, logout } = useUser();
   const [matches, setMatches] = useState<Match[]>([]);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const LIMIT = 20;
 
   const fetchMatches = useCallback(async (currentOffset: number) => {
-    if (!userId) return;
+    if (!userEmail) return;
     setLoading(true);
     try {
       // Fetching with limit and offset from your FastAPI parameters
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/matches?email=${userId}&limit=${LIMIT}&offset=${currentOffset}`
+        `${process.env.NEXT_PUBLIC_API_URL}/matches?email=${userEmail}&limit=${LIMIT}&offset=${currentOffset}`
       );
       const newData = await res.json();
       
@@ -39,17 +39,17 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userEmail]);
 
   useEffect(() => {
-    if (userId) {
+    if (userEmail) {
       setMatches([]); // Clear matches when user changes
       setOffset(0);
       fetchMatches(0);
     }
-  }, [userId, fetchMatches]);
+  }, [userEmail, fetchMatches]);
 
-  if (!userId) {
+  if (!userEmail) {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50">
           <div className="p-8 bg-white rounded-2xl shadow-xl border w-full max-w-md text-center">
@@ -73,7 +73,7 @@ export default function Home() {
         <div className="flex justify-between items-end mb-8">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Matches</h1>
-            <p className="text-sm text-slate-500">Loggged in as {userId}</p>
+            <p className="text-sm text-slate-500">Loggged in as {userEmail}</p>
           </div>
           <button 
             onClick={logout} 

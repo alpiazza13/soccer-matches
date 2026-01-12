@@ -3,33 +3,33 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface UserContextType {
-  userId: string | null;
-  setUserId: (id: string) => void;
+  userEmail: string | null;
+  setUserEmail: (email: string) => void;
   logout: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    const savedId = localStorage.getItem('soccer_user_id');
-    if (savedId) setUserId(savedId);
+    const savedEmail = localStorage.getItem('soccer_user_email');
+    if (savedEmail) setUserEmail(savedEmail);
   }, []);
 
-  const handleSetUserId = (id: string) => {
-    setUserId(id);
-    localStorage.setItem('soccer_user_id', id.toString());
+  const handleSetUserEmail = (email: string) => {
+    setUserEmail(email);
+    localStorage.setItem('soccer_user_email', email);
   };
 
   const logout = () => {
-    setUserId(null);
-    localStorage.removeItem('soccer_user_id');
+    setUserEmail(null);
+    localStorage.removeItem('soccer_user_email');
   };
 
   return (
-    <UserContext.Provider value={{ userId, setUserId: handleSetUserId, logout }}>
+    <UserContext.Provider value={{ userEmail, setUserEmail: handleSetUserEmail, logout }}>
       {children}
     </UserContext.Provider>
   );

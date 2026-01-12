@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useUser } from '../context/UserContext';
 
 export default function UserLogin() {
-  const { setUserId } = useUser();
+  const { setUserEmail } = useUser();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +22,7 @@ export default function UserLogin() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/me?email=${encodeURIComponent(email)}`);
       const data = await res.json();
       if (res.ok) {
-        setUserId(data.email);
+        setUserEmail(data.email);
       } else {
         setError(formatError(data) || "User not found.");
       }
@@ -43,7 +43,7 @@ const handleCreate = async (e?: React.FormEvent) => {
       });
       const data = await res.json();
       if (res.ok) {
-        setUserId(data.id);
+        setUserEmail(data.email);
       } else {
         setError(formatError(data) || "Could not create user.");
       }

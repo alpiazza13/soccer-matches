@@ -5,17 +5,17 @@ import { useState } from 'react';
 import { useUser } from '../context/UserContext';
 
 export default function MatchCard({ match }: { match: Match }) {
-    const { userId } = useUser();
+    const { userEmail } = useUser();
     const [done, setDone] = useState(match.is_done);
 
   const toggleDone = async () => {
-    if (!userId) return;
+    if (!userEmail) return;
     const newStatus = !done;
     setDone(newStatus); // Optimistic update
 
     try {
       // match.external_id is used here as per main.py logic
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/matches/${match.external_id}/status?email=${userId}&is_done=${newStatus}`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/matches/${match.external_id}/status?email=${userEmail}&is_done=${newStatus}`, {
         method: 'POST',
       });
     } catch (error) {
