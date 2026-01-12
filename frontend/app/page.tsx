@@ -67,20 +67,58 @@ export default function Home() {
     fetchMatches(nextOffset);
   };
 
+  const deleteAccount = async () => {
+    const confirmed = window.confirm(
+      "Are you sure? This will permanently delete your account and all your 'Done' match history."
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/me?email=${userEmail}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        logout();
+        alert("Your account has been successfully deleted.");
+      } else {
+          const data = await res.json();
+          alert(`Error: ${data.detail || 'Could not delete account'}`);
+      }
+    } catch (err) {
+        console.error("Delete account failed:", err);
+        alert("Server connection failed. Please try again later.");
+    }
+  };
+
   console.log("Match IDs in list:", matches.map(m => m.external_id));
   return (
       <main className="max-w-4xl mx-auto p-8 bg-slate-50 min-h-screen">
-        <div className="flex justify-between items-end mb-8">
+
+        <div className="flex justify-between items-end mb-8 border-b border-slate-200 pb-6">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Matches</h1>
-            <p className="text-sm text-slate-500">Loggged in as {userEmail}</p>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Matches</h1>
+            <p className="text-sm text-slate-500 font-medium">
+              Logged in as <span className="text-slate-700">{userEmail}</span>
+            </p>
           </div>
-          <button 
-            onClick={logout} 
-            className="text-xs font-semibold text-red-500 hover:bg-red-50 px-3 py-1 rounded transition-colors"
-          >
-            Sign Out
-          </button>
+          
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={deleteAccount} 
+              className="text-xs font-bold text-slate-400 hover:text-red-600 uppercase tracking-wider transition-colors"
+            >
+              Delete Account
+            </button>
+            
+            <button 
+              onClick={logout} 
+              className="text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-lg transition-all shadow-sm"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
         
         <div className="grid gap-3 mb-8">

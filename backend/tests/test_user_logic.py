@@ -101,3 +101,39 @@ def test_get_me_success(client_with_db, user_payload):
 def test_get_me_not_found(client_with_db):
     res = client_with_db.get("/users/me", params={"email": "nonexistent@example.com"})
     assert res.status_code == 404
+
+def test_delete_user_success(client_with_db, user_payload):
+    """Verify that a user can be successfully deleted by email."""
+    email = "delete_me@example.com"
+    client_with_db.post("/users", json=user_payload(email=email))
+    
+    res = client_with_db.delete(f"/users/me?email={email}")
+    assert res.status_code == 200
+    assert res.json()["message"] == "Account deleted successfully"
+
+    verify_res = client_with_db.get(f"/users/me?email={email}")
+    assert verify_res.status_code == 404
+
+
+def test_delete_user_cascades_to_matches(client_with_db, persisted_match, user_payload):
+    """Critical: Verify that deleting a user also deletes their match statuses (Cascade)."""
+    email = "cascade_test@example.com"
+    client_with_db.post("/users", json=user_payload(email=email))
+    
+    client_with_db.post(
+        f"/matches/{persisted_match.external_id}/status", 
+        params={"email": email, "is_done": True}
+    )
+    
+    client_with_db.delete(f"/users/me?email={email}")
+    
+    res = client_with_db.get("/matches", params={"email": email})
+    assert res.status_code == 200
+    assert res.json()[0]["is_done"] is False # for user that does not exist, is_done should be False
+
+
+def test_delete_user_not_found(client_with_db):
+    """Verify 404 when trying to delete a non-existent email."""
+    res = client_with_db.delete("/users/me?email=nonexistent@example.com")
+    assert res.status_code == 404
+    assert res.json()["detail"] == "User not found"

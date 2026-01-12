@@ -57,7 +57,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
 
     # This allows us to say `user.user_matches` to see their tracked games
-    user_matches = relationship("UserMatch", back_populates="user")
+    user_matches = relationship("UserMatch", back_populates="user", cascade="all, delete-orphan")
 
 class UserMatch(Base):
     """

@@ -211,6 +211,15 @@ def read_user_me(email: str, db: Session = Depends(get_db)):
         )
     return user
 
+@app.delete("/users/me")
+def delete_user(email: str, db: Session = Depends(get_db)):
+    user = db.query(UserModel).filter(UserModel.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    db.delete(user) # Delete user will cascade to UserMatchModel due to foreign key constraints
+    db.commit()
+    return {"message": "Account deleted successfully"}
 
 @app.post("/matches/{match_id}/status", response_model=UserMatchResponse)
 def toggle_match_done(match_id: int, email: str, is_done: bool, db: Session = Depends(get_db)):
