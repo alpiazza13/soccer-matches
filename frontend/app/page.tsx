@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import MatchCard from '../components/MatchCard';
 import UserLogin from '../components/UserLogin';
+import RefreshButton from '../components/RefreshButton';
 import { Match } from '../types/matches';
 import { useUser } from '../context/UserContext';
 
@@ -67,6 +68,11 @@ export default function Home() {
     fetchMatches(nextOffset);
   };
 
+  const handleSyncComplete = () => {
+    setOffset(0);
+    fetchMatches(0);
+};
+
   const deleteAccount = async () => {
     const confirmed = window.confirm(
       "Are you sure? This will permanently delete your account and all your 'Done' match history."
@@ -105,6 +111,8 @@ export default function Home() {
           </div>
           
           <div className="flex items-center gap-6">
+            <RefreshButton onSyncComplete={handleSyncComplete} />
+            
             <button 
               onClick={deleteAccount} 
               className="text-xs font-bold text-slate-400 hover:text-red-600 uppercase tracking-wider transition-colors"

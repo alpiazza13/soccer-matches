@@ -23,3 +23,5 @@
 	
 4. Create `.env.local` file in root of `frontend` folder, add `NEXT_PUBLIC_API_URL=http://localhost:8000`
 5. Start writing typescript code
+6. In frontend folder, run `npm install lucide-react`
+7. Packages installed through `npm` are added to `package.json` file. Run `npm install` to install all of them if starting dev work on a new machine.
