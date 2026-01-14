@@ -28,6 +28,10 @@ export default function RefreshButton({ onSyncComplete }: RefreshButtonProps) {
         method: 'POST',
       });
 
+      if (res.status === 429) {
+        alert("Someone else is currently syncing. Please wait a few seconds.");
+        return;
+      }
       if (res.ok) {
         onSyncComplete(); // Tell the page to re-fetch matches
         setCooldown(60);  // Set a 60-second cooldown

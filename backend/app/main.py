@@ -138,12 +138,19 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
     return UserResponse.model_validate(u)
 
+is_syncing_globally = False
+
 @app.post("/api/matches/sync")
 def trigger_sync(db: Session = Depends(get_db)):
     """
     Manually triggers a sync with the Football API to update local matches.
     """
+    global is_syncing_globally
+    if is_syncing_globally:
+        raise HTTPException(status_code=429, detail="Sync already in progress. Please wait.")
+    
     try:
+        is_syncing_globally = True
         perform_sync(db)
         return {"success": True, "message": "Database synced successfully"}
     except Exception as e:
@@ -152,6 +159,8 @@ def trigger_sync(db: Session = Depends(get_db)):
             status_code=500, 
             detail="Failed to sync with Football API. Check server logs."
         )
+    finally:
+        is_syncing_globally = False
 
 @app.get("/users/me", response_model=UserResponse)
 def read_user_me(email: str, db: Session = Depends(get_db)):

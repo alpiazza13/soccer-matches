@@ -30,7 +30,7 @@ export default function Home() {
 
         // If we are appending, filter out matches that already exist in 'prev'
         const existingIds = new Set(prev.map(m => m.external_id));
-        const uniqueNewData = newData.filter((m: Match) => !existingIds.has(m.id));
+        const uniqueNewData = newData.filter((m: Match) => !existingIds.has(m.external_id));
         
         return [...prev, ...uniqueNewData];
       });

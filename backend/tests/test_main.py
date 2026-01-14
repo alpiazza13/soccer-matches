@@ -128,6 +128,7 @@ class TestSyncEndpoint:
         """Verify the endpoint returns success when the sync function completes."""
         mock_perform = MagicMock()
         monkeypatch.setattr("app.main.perform_sync", mock_perform)
+        monkeypatch.setattr("app.main.is_syncing_globally", False)
         
         response = client_with_db.post("/api/matches/sync")
         
@@ -138,12 +139,22 @@ class TestSyncEndpoint:
         }
         mock_perform.assert_called_once()
 
-    def test_trigger_sync_failure(self, client_with_db, monkeypatch):
-        """Verify the endpoint returns 500 if the sync logic raises an exception."""
-        mock_perform = MagicMock(side_effect=Exception("API connection timeout"))
+    def test_trigger_sync_failure_releases_lock(self, client_with_db, monkeypatch):
+        """Verify the endpoint returns 500 if the sync logic raises an exception and the lock is still released"""
+        mock_perform = MagicMock(side_effect=Exception("Database Timeout"))
         monkeypatch.setattr("app.main.perform_sync", mock_perform)
+        monkeypatch.setattr("app.main.is_syncing_globally", False)
         
         response = client_with_db.post("/api/matches/sync")
-        
         assert response.status_code == 500
-        assert "Failed to sync" in response.json()["detail"]
+        
+        mock_perform.side_effect = None
+        response_two = client_with_db.post("/api/matches/sync")
+        assert response_two.status_code == 200
+
+    def test_trigger_sync_already_in_progress(self, client_with_db, monkeypatch):
+        """Verify 429 is returned if the global lock is already active."""
+        monkeypatch.setattr("app.main.is_syncing_globally", True)
+        response = client_with_db.post("/api/matches/sync")
+        assert response.status_code == 429
+        assert "already in progress" in response.json()["detail"]
