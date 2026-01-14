@@ -7,10 +7,9 @@ from unittest.mock import Mock, MagicMock
 from datetime import datetime
 from types import SimpleNamespace
 
-from app.main import app
+from app.main import app, perform_sync
 from app.services.football_api import FootballAPIClient
 from tests.conftest import MockTimeProvider, MockDatetimeProvider
-
 
 @pytest.fixture
 def client():
@@ -119,3 +118,32 @@ def test_matches_pagination_offset(client_with_db, persisted_match):
     res = client_with_db.get("/matches", params={"offset": 10})
     assert res.status_code == 200
     assert res.json() == []
+
+
+
+class TestSyncEndpoint:
+    """Test suite for the manual database sync endpoint."""
+
+    def test_trigger_sync_success(self, client_with_db, monkeypatch):
+        """Verify the endpoint returns success when the sync function completes."""
+        mock_perform = MagicMock()
+        monkeypatch.setattr("app.main.perform_sync", mock_perform)
+        
+        response = client_with_db.post("/api/matches/sync")
+        
+        assert response.status_code == 200
+        assert response.json() == {
+            "success": True, 
+            "message": "Database synced successfully"
+        }
+        mock_perform.assert_called_once()
+
+    def test_trigger_sync_failure(self, client_with_db, monkeypatch):
+        """Verify the endpoint returns 500 if the sync logic raises an exception."""
+        mock_perform = MagicMock(side_effect=Exception("API connection timeout"))
+        monkeypatch.setattr("app.main.perform_sync", mock_perform)
+        
+        response = client_with_db.post("/api/matches/sync")
+        
+        assert response.status_code == 500
+        assert "Failed to sync" in response.json()["detail"]

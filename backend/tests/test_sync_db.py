@@ -188,3 +188,36 @@ def test_sync_data_continues_on_upsert_error(monkeypatch, sample_match):
     assert mock_db.close.called
     assert upsert_comp.call_count == 2
     upsert_match.assert_called_with(mock_db, m2)
+
+def test_perform_sync_logic(monkeypatch, mock_db, sample_match):
+    # Mock the API client and date logic
+    client = MagicMock()
+    client.fetch_all_matches.return_value = ([sample_match], 1)
+    monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
+    monkeypatch.setattr(sync_db, "get_sync_start_date", lambda db: "2026-01-01")
+
+    # Mock upsert functions
+    upsert_comp = MagicMock()
+    upsert_team = MagicMock()
+    upsert_match = MagicMock()
+    monkeypatch.setattr(sync_db, "upsert_competition", upsert_comp)
+    monkeypatch.setattr(sync_db, "upsert_team", upsert_team)
+    monkeypatch.setattr(sync_db, "upsert_match", upsert_match)
+
+    # Execute the core logic
+    sync_db.perform_sync(mock_db)
+
+    # Verify commits happen at the end
+    upsert_comp.assert_called_once()
+    mock_db.commit.assert_called_once()
+
+def test_perform_sync_does_not_close_db(monkeypatch, mock_db):
+    # Setup minimal mocks to let perform_sync run
+    client = MagicMock()
+    client.fetch_all_matches.return_value = ([], 0)
+    monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
+    
+    sync_db.perform_sync(mock_db)
+    
+    # Ensure close was never called inside the unit
+    assert mock_db.close.call_count == 0

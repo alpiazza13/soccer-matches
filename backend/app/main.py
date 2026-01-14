@@ -13,6 +13,7 @@ from app.services.football_api import FootballAPIClient
 from app.dependencies import get_football_api_client
 from app.database import SessionLocal, Base, engine
 from app.models import Match as MatchModel, User as UserModel, UserMatch as UserMatchModel
+from app.scripts.sync_db import perform_sync
 from app.schemas import (
     MatchSchema,
     UserCreate,
@@ -33,9 +34,6 @@ def get_db():
 
 @asynccontextmanager
 async def lifespan(app):
-    # Only create DB schema in non-production environments
-    if os.getenv("ENV") != "production":
-        Base.metadata.create_all(bind=engine)
     yield
 
 
@@ -72,63 +70,6 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
-
-
-@app.get("/api/test-fetch")
-async def test_fetch(
-    client: FootballAPIClient = Depends(get_football_api_client)
-):
-    """
-    Test endpoint to fetch matches from Football Data API.
-    Fetches matches from Premier League for the last 7 days.
-    """
-    try:
-        # Fetch matches from Premier League for the last 7 days
-        date_from = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        date_to = datetime.now().strftime("%Y-%m-%d")
-        
-        print(f"\n{'='*60}")
-        print("Testing Football Data API connection...")
-        print(f"Date range: {date_from} to {date_to}")
-        print(f"{'='*60}\n")
-        
-        processed_matches, raw_matches = client.get_matches(
-            competition="premier league",
-            date_from=date_from,
-            date_to=date_to
-        )
-        
-        print(f"\n{'='*60}")
-        print(f"Successfully fetched {len(processed_matches)} matches")
-        print(f"{'='*60}\n")
-        
-        # Print first few matches to console
-        for i, match in enumerate(processed_matches[:5], 1):
-            print(f"Match {i}:")
-            print(f"  {match.home_team.name} vs {match.away_team.name}")
-            print(f"  Score: {match.score.fullTime.home} - {match.score.fullTime.away}")
-            print(f"  Date: {match.utc_date}")
-            print(f"  Competition: {match.competition.name}")
-            print()
-        
-        if len(processed_matches) > 5:
-            print(f"... and {len(processed_matches) - 5} more matches\n")
-        
-        return JSONResponse(content={
-            "success": True,
-            "message": f"Successfully fetched {len(processed_matches)} matches",
-            "matches_count": len(processed_matches),
-            "date_range": {
-                "from": date_from,
-                "to": date_to
-            },
-        })
-    
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        print(f"Error in test_fetch: {e}")
-        raise HTTPException(status_code=500, detail=f"Error fetching matches: {str(e)}")
 
 
 @app.get("/matches", response_model=List[MatchSchema])
@@ -197,6 +138,20 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
     return UserResponse.model_validate(u)
 
+@app.post("/api/matches/sync")
+def trigger_sync(db: Session = Depends(get_db)):
+    """
+    Manually triggers a sync with the Football API to update local matches.
+    """
+    try:
+        perform_sync(db)
+        return {"success": True, "message": "Database synced successfully"}
+    except Exception as e:
+        print(f"Manual sync failed: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Failed to sync with Football API. Check server logs."
+        )
 
 @app.get("/users/me", response_model=UserResponse)
 def read_user_me(email: str, db: Session = Depends(get_db)):

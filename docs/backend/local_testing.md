@@ -1,4 +1,8 @@
-1. Enter virtual environment using `source venv/bin/activate` from root folder
+1. Enter virtual environment using from root folder using:
+	```
+	source venv/bin/activate
+	```
+	` 
 2. Test test-fetch endpoint
 	1. From the backend folder, run the server using:
 		```
@@ -13,7 +17,10 @@
 		python -m pytest tests/test_user_interactions.py -v
 		```
 4. Test sync_db.py
-	1. From backend directory, run `python -m app.scripts.sync_db`
+	1. From backend directory, run:
+	```
+		python -m app.scripts.sync_db
+	```
 	2. Check results in Supabase and terminal output.
 		1. Or if code is pointing to local testing DB, view data in TablePlus or by entering the below in terminal
 	```

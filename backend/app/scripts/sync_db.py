@@ -83,14 +83,10 @@ def upsert_match(db: Session, m: MatchSchema):
     )
     db.execute(stmt)
 
-def sync_data():
-    print("Starting sync DB...")
-    if os.getenv("ENV") != "production":
-        Base.metadata.create_all(bind=engine)
 
-    db = SessionLocal()
+def perform_sync(db: Session):
+    """Core logic to be called by both script and API"""
     client = FootballAPIClient()
-    
     start_date = get_sync_start_date(db)
     print("Got start date = ", start_date)
     processed_matches, _ = client.fetch_all_matches(date_from=start_date)
@@ -104,9 +100,19 @@ def sync_data():
         except Exception as e:
             print(f"Sync Error for match {m.match_id}: {e}")
             continue
-
     db.commit()
-    db.close()
+
+def sync_data():
+    """Wrapper for the CLI script"""
+    print("Starting sync DB...")
+    db = SessionLocal()
+    try:
+        perform_sync(db)
+    except Exception as e:
+        print(f"Script sync failed: {e}")
+        db.rollback()
+    finally:
+        db.close()
     print("Finished syncing db.")
 
 if __name__ == "__main__":
