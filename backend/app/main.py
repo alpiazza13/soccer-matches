@@ -1,17 +1,13 @@
 from fastapi import FastAPI, HTTPException, Depends
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime, timedelta
 from typing import List, cast
-import os
 from contextlib import asynccontextmanager
 
 from sqlalchemy.orm import Session
-from sqlalchemy import outerjoin, literal
+from sqlalchemy import literal
 
-from app.services.football_api import FootballAPIClient
-from app.dependencies import get_football_api_client
-from app.database import SessionLocal, Base, engine
+from app.services.sync_service import get_sync_freshness, update_sync_metadata
+from app.database import SessionLocal
 from app.models import Match as MatchModel, User as UserModel, UserMatch as UserMatchModel
 from app.scripts.sync_db import perform_sync
 from app.schemas import (
@@ -29,8 +25,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
 
 @asynccontextmanager
 async def lifespan(app):
@@ -138,6 +132,8 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
     return UserResponse.model_validate(u)
 
+
+
 is_syncing_globally = False
 
 @app.post("/api/matches/sync")
@@ -151,14 +147,18 @@ def trigger_sync(db: Session = Depends(get_db)):
     
     try:
         is_syncing_globally = True
+        if get_sync_freshness(db, "matches_sync"):
+            return {"success": True, "message": "Data is already fresh."}
         perform_sync(db)
+        update_sync_metadata(db, "matches_sync", status="SUCCESS")
         return {"success": True, "message": "Database synced successfully"}
+    
     except Exception as e:
+        db.rollback()
+        update_sync_metadata(db, "matches_sync", status="FAILED", error=str(e))
         print(f"Manual sync failed: {e}")
-        raise HTTPException(
-            status_code=500, 
-            detail="Failed to sync with Football API. Check server logs."
-        )
+        raise HTTPException(status_code=500, detail="Failed to sync with Football API. Check server logs.")
+    
     finally:
         is_syncing_globally = False
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Boolean, Text
 from sqlalchemy.orm import relationship, mapped_column, Mapped
 from datetime import datetime, timezone
 from app.database import Base
@@ -75,3 +75,12 @@ class UserMatch(Base):
 
     user = relationship("User", back_populates="user_matches")
     match = relationship("Match", back_populates="user_matches")
+
+class SyncMetadata(Base):
+    __tablename__ = "sync_metadata"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sync_key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    last_run_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
