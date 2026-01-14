@@ -59,6 +59,19 @@ def test_get_sync_freshness_exact_boundary(db_session):
     db_session.commit()
     assert get_sync_freshness(db_session, "boundary_test", 300) is False
 
+def test_get_sync_freshness_naive_datetime(db_session):
+    """
+    Simulate a database returning a 'naive' datetime (no timezone info),
+    which is common in many DB configurations.
+    """
+    # Create a naive datetime (representing UTC time but without the tzinfo object)
+    naive_recent = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=1)
+    meta = SyncMetadata(sync_key="naive_test", last_run_at=naive_recent)
+    db_session.add(meta)
+    db_session.commit()
+    
+    assert get_sync_freshness(db_session, "naive_test", threshold_seconds=300) is True
+
 def test_get_last_sync_time(db_session):
     # Case: No record exists
     assert get_last_sync_time(db_session, "matches_sync") is None

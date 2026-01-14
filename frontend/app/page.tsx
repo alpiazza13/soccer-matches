@@ -7,11 +7,17 @@ import RefreshButton from '../components/RefreshButton';
 import { Match } from '../types/matches';
 import { useUser } from '../context/UserContext';
 
+interface SyncStatus {
+  last_run_at: string | null;
+  is_fresh: boolean;
+}
+
 export default function Home() {
   const { userEmail, logout } = useUser();
   const [matches, setMatches] = useState<Match[]>([]);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const LIMIT = 20;
 
   const fetchMatches = useCallback(async (currentOffset: number) => {
@@ -42,13 +48,37 @@ export default function Home() {
     }
   }, [userEmail]);
 
+
+  const fetchSyncStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/matches/sync/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setSyncStatus(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch sync status:", error);
+    }
+  }, []);
+
+  const handleSyncComplete = useCallback(() => {
+    setOffset(0);
+    fetchMatches(0);
+    fetchSyncStatus(); 
+  }, [fetchMatches, fetchSyncStatus]);
+
+
   useEffect(() => {
     if (userEmail) {
       setMatches([]); // Clear matches when user changes
       setOffset(0);
       fetchMatches(0);
+      fetchSyncStatus();
+
+      const interval = setInterval(() => {fetchSyncStatus();}, 30000); // Check every 30 seconds
+      return () => clearInterval(interval); // Cleanup on unmount
     }
-  }, [userEmail, fetchMatches]);
+  }, [userEmail, fetchMatches, fetchSyncStatus]);
 
   if (!userEmail) {
       return (
@@ -68,10 +98,6 @@ export default function Home() {
     fetchMatches(nextOffset);
   };
 
-  const handleSyncComplete = () => {
-    setOffset(0);
-    fetchMatches(0);
-};
 
   const deleteAccount = async () => {
     const confirmed = window.confirm(
@@ -111,7 +137,11 @@ export default function Home() {
           </div>
           
           <div className="flex items-center gap-6">
-            <RefreshButton onSyncComplete={handleSyncComplete} />
+            <RefreshButton 
+              onSyncComplete={handleSyncComplete} 
+              isFresh={syncStatus?.is_fresh ?? false}
+              lastSynced={syncStatus?.last_run_at ?? null}
+            />
             
             <button 
               onClick={deleteAccount} 

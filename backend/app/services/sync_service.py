@@ -5,11 +5,13 @@ from app.models import SyncMetadata
 # Helper to check if a sync is actually needed
 def get_sync_freshness(db: Session, sync_key: str, threshold_seconds: int = 300) -> bool:
     sync_meta = db.query(SyncMetadata).filter_by(sync_key=sync_key).first()
-    if not sync_meta:
+    if not sync_meta or not sync_meta.last_run_at:
         return False
     
-    # Ensure we compare timezone-aware datetimes
-    last_run = sync_meta.last_run_at.replace(tzinfo=timezone.utc)
+    last_run = sync_meta.last_run_at
+    if last_run.tzinfo is None: # If the DB returns a naive datetime, assume it was UTC
+        last_run = last_run.replace(tzinfo=timezone.utc)
+        
     time_diff = datetime.now(timezone.utc) - last_run
     return time_diff.total_seconds() < threshold_seconds
 
