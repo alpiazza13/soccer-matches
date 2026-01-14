@@ -2,6 +2,7 @@
 Integration tests for FastAPI endpoints.
 """
 import pytest
+from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from unittest.mock import ANY, Mock, MagicMock
 
@@ -182,3 +183,26 @@ class TestSyncEndpoint:
         response = client_with_db.post("/api/matches/sync")
         assert response.status_code == 429
         assert "already in progress" in response.json()["detail"]
+
+    def test_get_sync_status_empty(self, client_with_db):
+        """Verify status endpoint when no sync has ever run."""
+        response = client_with_db.get("/api/matches/sync/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["last_run_at"] is None
+        assert data["is_fresh"] is False
+
+    def test_get_sync_status_populated(self, client_with_db, monkeypatch):
+        """Verify status endpoint returns correct metadata."""
+        fixed_now = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        
+        # Mock the service helpers so we don't depend on DB state
+        monkeypatch.setattr("app.main.get_last_sync_time", lambda db, key: fixed_now)
+        monkeypatch.setattr("app.main.get_sync_freshness", lambda db, key: True)
+        
+        response = client_with_db.get("/api/matches/sync/status")
+        assert response.status_code == 200
+        data = response.json()
+        # ISO format check
+        assert "2024-01-01T12:00:00" in data["last_run_at"]
+        assert data["is_fresh"] is True

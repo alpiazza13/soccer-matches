@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
 from sqlalchemy import literal
 
-from app.services.sync_service import get_sync_freshness, update_sync_metadata
+from app.services.sync_service import get_sync_freshness, update_sync_metadata, get_last_sync_time
 from app.database import SessionLocal
 from app.models import Match as MatchModel, User as UserModel, UserMatch as UserMatchModel
 from app.scripts.sync_db import perform_sync
@@ -161,6 +161,14 @@ def trigger_sync(db: Session = Depends(get_db)):
     
     finally:
         is_syncing_globally = False
+
+@app.get("/api/matches/sync/status")
+def get_sync_status(db: Session = Depends(get_db)):
+    last_sync = get_last_sync_time(db, "matches_sync")
+    return {
+        "last_run_at": last_sync,
+        "is_fresh": get_sync_freshness(db, "matches_sync")
+    }
 
 @app.get("/users/me", response_model=UserResponse)
 def read_user_me(email: str, db: Session = Depends(get_db)):

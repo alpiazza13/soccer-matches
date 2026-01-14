@@ -25,3 +25,7 @@ def update_sync_metadata(db: Session, sync_key: str, status: str, error: str | N
     sync_meta.last_error = error
     db.commit()
 
+def get_last_sync_time(db: Session, sync_key: str) -> datetime | None:
+    sync_meta = db.query(SyncMetadata).filter_by(sync_key=sync_key).first()
+    return sync_meta.last_run_at if sync_meta else None
+
