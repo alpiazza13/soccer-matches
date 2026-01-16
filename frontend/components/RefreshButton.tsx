@@ -22,11 +22,23 @@ export default function RefreshButton({ onSyncComplete, isFresh, lastSynced }: R
 
       const lastDate = new Date(lastSynced).getTime();
       const now = new Date().getTime();
-      const diffInMinutes = Math.floor((now - lastDate) / 60000);
+      const diffInSeconds = Math.floor((now - lastDate) / 1000);
+      const diffInMinutes = Math.floor(diffInSeconds / 60);
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      const diffInDays = Math.floor(diffInHours / 24);
 
-      if (diffInMinutes < 1) setTimeAgo('Just now');
-      else if (diffInMinutes === 1) setTimeAgo('1 minute ago');
-      else setTimeAgo(`${diffInMinutes} minutes ago`);
+      if (diffInSeconds < 60) {
+        setTimeAgo('Just now');
+      } else if (diffInMinutes < 60) {
+        setTimeAgo(`${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`);
+      } else if (diffInHours < 24) {
+        setTimeAgo(`${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`);
+      } else if (diffInDays < 7) {
+        setTimeAgo(`${diffInDays} ${diffInDays === 1 ? 'day' : 'days'} ago`);
+      } else {
+        // Fallback to a simple date string for very old data
+        setTimeAgo(new Date(lastSynced).toLocaleDateString());
+      }
     };
 
     calculateTimeAgo();
