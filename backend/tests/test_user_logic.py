@@ -139,3 +139,35 @@ def test_delete_user_not_found(client_with_db):
     res = client_with_db.delete("/users/me?email=nonexistent@example.com")
     assert res.status_code == 404
     assert res.json()["detail"] == "User not found"
+
+
+def test_update_user_settings_success(client_with_db, user_payload):
+    """Verify that a user can update their hide_scores preference."""
+    email = "settings@example.com"
+    client_with_db.post("/users", json=user_payload(email=email))
+    
+    res = client_with_db.patch(
+        f"/users/me/settings?email={email}", 
+        json={"hide_scores": True}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["hide_scores"] is True
+    assert data["email"] == email
+
+    res = client_with_db.patch(
+        f"/users/me/settings?email={email}", 
+        json={"hide_scores": False}
+    )
+    assert res.status_code == 200
+    assert res.json()["hide_scores"] is False
+
+
+def test_update_user_settings_user_not_found(client_with_db):
+    """Verify 404 is returned if updating settings for non-existent email."""
+    res = client_with_db.patch(
+        "/users/me/settings?email=nonexistent@example.com", 
+        json={"hide_scores": True}
+    )
+    assert res.status_code == 404
+    assert res.json()["detail"] == "User not found"

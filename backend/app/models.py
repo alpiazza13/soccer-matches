@@ -55,8 +55,8 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
+    hide_scores: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    # This allows us to say `user.user_matches` to see their tracked games
     user_matches = relationship("UserMatch", back_populates="user", cascade="all, delete-orphan")
 
 class UserMatch(Base):

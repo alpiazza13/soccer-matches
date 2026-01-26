@@ -15,6 +15,7 @@ from app.schemas import (
     UserCreate,
     UserResponse,
     UserMatchResponse,
+    UserSettingsUpdate,
 )
 from sqlalchemy.exc import IntegrityError
 
@@ -192,6 +193,22 @@ def delete_user(email: str, db: Session = Depends(get_db)):
     db.delete(user) # Delete user will cascade to UserMatchModel due to foreign key constraints
     db.commit()
     return {"message": "Account deleted successfully"}
+
+@app.patch("/users/me/settings", response_model=UserResponse)
+def update_user_settings(
+    settings: UserSettingsUpdate, 
+    email: str, 
+    db: Session = Depends(get_db)
+):
+    """Update user preferences like hide_scores."""
+    user = db.query(UserModel).filter(UserModel.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.hide_scores = settings.hide_scores
+    db.commit()
+    db.refresh(user)
+    return user
 
 @app.post("/matches/{match_id}/status", response_model=UserMatchResponse)
 def toggle_match_done(match_id: int, email: str, is_done: bool, db: Session = Depends(get_db)):

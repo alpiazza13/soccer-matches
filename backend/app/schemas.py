@@ -61,6 +61,7 @@ class UserCreate(BaseModel):
 class UserResponse(BaseModel):
     id: int
     email: EmailStr
+    hide_scores: bool
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -71,3 +72,6 @@ class UserMatchResponse(BaseModel):
     is_done: bool
 
     model_config = ConfigDict()
+
+class UserSettingsUpdate(BaseModel):
+    hide_scores: bool

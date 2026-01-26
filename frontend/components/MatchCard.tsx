@@ -1,12 +1,13 @@
 'use client';
 
 import { Match } from '../types/matches';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useUser } from '../context/UserContext';
 
 export default function MatchCard({ match, onToggle }: { match: Match, onToggle: (id: number, isDone: boolean) => void }) {
-    const { userEmail } = useUser();
+    const { userEmail, hideScores, isLoadingSettings } = useUser();
     const [done, setDone] = useState(match.is_done);
+    const [showScoreLocally, setShowScoreLocally] = useState(false);
 
   const toggleDone = async () => {
     if (!userEmail) return;
@@ -26,6 +27,13 @@ export default function MatchCard({ match, onToggle }: { match: Match, onToggle:
     }
   };
 
+  useEffect(() => {
+    // If the global setting is toggled ON, re-hide any individually revealed scores
+    if (hideScores) {
+      setShowScoreLocally(false);
+    }
+  }, [hideScores]);
+
   return (
     <div className="flex items-center justify-between p-4 bg-white border rounded-xl shadow-sm">
       <div className="w-24 text-sm font-bold text-slate-900">
@@ -34,9 +42,24 @@ export default function MatchCard({ match, onToggle }: { match: Match, onToggle:
 
       <div className="flex-1 flex items-center justify-center gap-4">
         <span className="flex-1 text-right">{match.home_team.short_name}</span>
-        <span className="font-mono bg-slate-100 px-2 rounded">
+
+        <div 
+          className="relative group cursor-pointer"
+          onClick={() => hideScores && setShowScoreLocally(!showScoreLocally)}
+        >
+          <span className={`font-mono bg-slate-100 px-2 rounded transition-all duration-300 ${
+            (hideScores || isLoadingSettings) && !showScoreLocally ? 'blur-md select-none' : ''
+          }`}>
             {match.score?.fullTime?.home ?? 0} - {match.score?.fullTime?.away ?? 0}
-        </span>
+          </span>
+          
+          {hideScores && !showScoreLocally && (
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold uppercase text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
+              Show
+            </span>
+          )}
+        </div>
+
         <span className="flex-1 text-left">{match.away_team.short_name}</span>
       </div>
 

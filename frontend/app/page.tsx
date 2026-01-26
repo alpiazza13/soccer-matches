@@ -13,7 +13,7 @@ interface SyncStatus {
 }
 
 export default function Home() {
-  const { userEmail, logout } = useUser();
+  const { userEmail, logout, hideScores, setHideScores } = useUser();
   const [matches, setMatches] = useState<Match[]>([]);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -90,6 +90,7 @@ export default function Home() {
     fetchMatches(0);
   }, [hideDone]);
 
+
   if (!userEmail) {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50">
@@ -158,6 +159,19 @@ export default function Home() {
               />
               <label htmlFor="hideDone" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer select-none">
                 Hide Completed
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="hideScores"
+                checked={hideScores}
+                onChange={(e) => setHideScores(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="hideScores" className="text-sm font-medium text-slate-600 cursor-pointer">
+                Hide Scores
               </label>
             </div>
 
