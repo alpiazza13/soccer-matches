@@ -18,6 +18,7 @@ export default function Home() {
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [hideDone, setHideDone] = useState(false);
   const LIMIT = 20;
 
   const fetchMatches = useCallback(async (currentOffset: number) => {
@@ -26,18 +27,15 @@ export default function Home() {
     try {
       // Fetching with limit and offset from your FastAPI parameters
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/matches?email=${userEmail}&limit=${LIMIT}&offset=${currentOffset}`
+        `${process.env.NEXT_PUBLIC_API_URL}/matches?email=${userEmail}&limit=${LIMIT}&offset=${currentOffset}&hide_done=${hideDone}`
       );
       const newData = await res.json();
       
       setMatches(prev => {
-        // If it's a fresh load (offset 0), just return the new data
         if (currentOffset === 0) return newData;
-
         // If we are appending, filter out matches that already exist in 'prev'
         const existingIds = new Set(prev.map(m => m.external_id));
         const uniqueNewData = newData.filter((m: Match) => !existingIds.has(m.external_id));
-        
         return [...prev, ...uniqueNewData];
       });
       
@@ -46,8 +44,15 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [userEmail]);
+  }, [userEmail, hideDone]);
 
+  const visibleMatches = hideDone ? matches.filter(match => !match.is_done) : matches;
+
+  const toggleMatchLocal = (matchId: number, isDone: boolean) => {
+      setMatches(prev => 
+        prev.map(m => m.external_id === matchId ? { ...m, is_done: isDone } : m)
+      );
+    };
 
   const fetchSyncStatus = useCallback(async () => {
     try {
@@ -79,6 +84,11 @@ export default function Home() {
       return () => clearInterval(interval); // Cleanup on unmount
     }
   }, [userEmail, fetchMatches, fetchSyncStatus]);
+
+  useEffect(() => {
+    setOffset(0);
+    fetchMatches(0);
+  }, [hideDone]);
 
   if (!userEmail) {
       return (
@@ -137,6 +147,20 @@ export default function Home() {
           </div>
           
           <div className="flex items-center gap-6">
+
+            <div className="flex items-center gap-2 pr-4 border-r border-slate-200">
+              <input
+                type="checkbox"
+                id="hideDone"
+                checked={hideDone}
+                onChange={(e) => setHideDone(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <label htmlFor="hideDone" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer select-none">
+                Hide Completed
+              </label>
+            </div>
+
             <RefreshButton 
               onSyncComplete={handleSyncComplete} 
               isFresh={syncStatus?.is_fresh ?? false}
@@ -160,8 +184,12 @@ export default function Home() {
         </div>
         
         <div className="grid gap-3 mb-8">
-          {matches.map((match) => (
-            <MatchCard key={match.external_id} match={match} />
+          {visibleMatches.map((match) => (
+            <MatchCard 
+              key={match.external_id} 
+              match={match} 
+              onToggle={toggleMatchLocal}
+            />
           ))}
         </div>
 

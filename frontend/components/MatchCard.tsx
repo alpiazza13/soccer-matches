@@ -4,7 +4,7 @@ import { Match } from '../types/matches';
 import { useState } from 'react';
 import { useUser } from '../context/UserContext';
 
-export default function MatchCard({ match }: { match: Match }) {
+export default function MatchCard({ match, onToggle }: { match: Match, onToggle: (id: number, isDone: boolean) => void }) {
     const { userEmail } = useUser();
     const [done, setDone] = useState(match.is_done);
 
@@ -12,6 +12,7 @@ export default function MatchCard({ match }: { match: Match }) {
     if (!userEmail) return;
     const newStatus = !done;
     setDone(newStatus); // Optimistic update
+    onToggle(match.external_id, newStatus); // Notify parent to update local state
 
     try {
       // match.external_id is used here as per main.py logic
@@ -20,6 +21,7 @@ export default function MatchCard({ match }: { match: Match }) {
       });
     } catch (error) {
       setDone(!newStatus); // Revert on error
+      onToggle(match.external_id, !newStatus); // Revert in parent
       console.error("Failed to update status", error);
     }
   };

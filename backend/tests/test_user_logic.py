@@ -42,7 +42,9 @@ def test_toggle_match_done_success(client_with_db, persisted_match, user_payload
         # mark match not done
         res = client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"email": user.email, "is_done": False})
         assert res.status_code == 200
-        assert um.is_done is True
+        body_updated = res.json()
+        um_updated = UserMatchResponse.model_validate(body_updated)
+        assert um_updated.is_done is False
 
 
 

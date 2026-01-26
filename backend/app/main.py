@@ -209,11 +209,11 @@ def toggle_match_done(match_id: int, email: str, is_done: bool, db: Session = De
     if user_match:
            user_match.is_done = is_done
     else:
-        user_match = UserMatchModel(user_id=user.id, match_id=match.id, is_done=True)
+        user_match = UserMatchModel(user_id=user.id, match_id=match.id, is_done=is_done)
         db.add(user_match)
 
     db.commit()
-    return UserMatchResponse(user_id=cast(int, user.id), match_id=match_id, is_done=True)
+    return UserMatchResponse(user_id=cast(int, user.id), match_id=match_id, is_done=is_done)
 
 
 if __name__ == "__main__":
