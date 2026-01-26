@@ -23,7 +23,9 @@ export default function Home() {
 
   const fetchMatches = useCallback(async (currentOffset: number) => {
     if (!userEmail) return;
-    setLoading(true);
+    if (currentOffset > 0) {
+      setLoading(true);
+    }
     try {
       // Fetching with limit and offset from your FastAPI parameters
       const res = await fetch(
@@ -207,6 +209,7 @@ export default function Home() {
           ))}
         </div>
 
+      {matches.length > 0 && (
         <div className="flex justify-center pb-12">
           <button
             onClick={handleLoadMore}
@@ -216,6 +219,8 @@ export default function Home() {
             {loading ? 'Loading...' : 'Load More'}
           </button>
         </div>
+      )}
+
       </main>
     );
   }
