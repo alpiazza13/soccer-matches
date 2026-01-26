@@ -92,6 +92,12 @@ export default function Home() {
     fetchMatches(0);
   }, [hideDone]);
 
+  useEffect(() => {
+    if (!userEmail) {
+      setMatches([]);
+      setOffset(0);
+    }
+  }, [userEmail]);
 
   if (!userEmail) {
       return (
