@@ -215,7 +215,7 @@ export default function Home() {
           ))}
         </div>
 
-      {matches.length > 0 && (
+      {visibleMatches.length > 0 && (
         <div className="flex justify-center pb-12">
           <button
             onClick={handleLoadMore}
