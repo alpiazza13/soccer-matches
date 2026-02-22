@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useUser } from '../context/UserContext';
 
 export default function UserLogin() {
-  const { setUserEmail } = useUser();
+  const { setToken } = useUser();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const formatError = (data: any) => {
@@ -16,15 +17,24 @@ export default function UserLogin() {
 
   const handleLogin = async () => {
     setError(null);
-    if (!email) return;
+    
+    // OAuth2PasswordRequestForm expects x-www-form-urlencoded data
+    const formData = new URLSearchParams();
+    formData.append('username', email); // backend uses 'username' for the email
+    formData.append('password', password);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/me?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData,
+      });
+      
       const data = await res.json();
       if (res.ok) {
-        setUserEmail(data.email);
+        setToken(data.access_token); // Save the JWT token
       } else {
-        setError(formatError(data) || "User not found.");
+        setError(formatError(data) || "Login failed");
       }
     } catch (err) {
       setError("Server connection failed.");
@@ -36,14 +46,14 @@ const handleCreate = async (e?: React.FormEvent) => {
     setError(null);
     if (!email) return;
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, username: email.split('@')[0] }),
-      });
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }), // Sending actual password now
+        });
       const data = await res.json();
       if (res.ok) {
-        setUserEmail(data.email);
+        setToken(data.access_token);
       } else {
         setError(formatError(data) || "Could not create user.");
       }
@@ -54,6 +64,7 @@ const handleCreate = async (e?: React.FormEvent) => {
 
 return (
     <div className="space-y-6">
+      {/* Email Field */}
       <div>
         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">
           Your Email
@@ -64,10 +75,31 @@ return (
           className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              //focus password field instead of submitting immediately
+              document.getElementById('password-input')?.focus();
+            }
+          }}
         />
       </div>
 
+    {/* Password Field */}
+    <div>
+      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">
+        Password
+      </label>
+      <input
+        type="password"
+        placeholder="••••••••"
+        className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+      />
+    </div>
+
+      {/* Action Buttons */}
       <div className="flex gap-3">
         <button 
           onClick={handleLogin}

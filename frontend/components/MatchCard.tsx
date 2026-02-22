@@ -5,20 +5,24 @@ import { useEffect, useState } from 'react';
 import { useUser } from '../context/UserContext';
 
 export default function MatchCard({ match, onToggle }: { match: Match, onToggle: (id: number, isDone: boolean) => void }) {
-    const { userEmail, hideScores, isLoadingSettings } = useUser();
+    const { token, hideScores, isLoadingSettings } = useUser();
     const [done, setDone] = useState(match.is_done);
     const [showScoreLocally, setShowScoreLocally] = useState(false);
 
   const toggleDone = async () => {
-    if (!userEmail) return;
+    if (!token) return;
     const newStatus = !done;
     setDone(newStatus); // Optimistic update
     onToggle(match.external_id, newStatus); // Notify parent to update local state
 
     try {
       // match.external_id is used here as per main.py logic
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/matches/${match.external_id}/status?email=${userEmail}&is_done=${newStatus}`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/matches/${match.external_id}/status?is_done=${newStatus}`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
       });
     } catch (error) {
       setDone(!newStatus); // Revert on error

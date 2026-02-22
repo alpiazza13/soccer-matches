@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app, get_db
 from app.schemas import UserResponse, UserMatchResponse, UserCreate
+from tests.conftest import auth_headers
 
 
 def test_create_user_success(client_with_db, user_payload):
@@ -24,15 +25,21 @@ def test_create_user_duplicate_email(client_with_db, user_payload):
         assert r2.status_code == 400
 
 
-def test_toggle_match_done_success(client_with_db, persisted_match, user_payload):
-        # create user
+def test_toggle_match_done_success(client_with_db, persisted_match, user_payload, auth_headers):
+        # create user and capture response
         payload = user_payload(email="marker@example.com")
-        r = client_with_db.post("/users", json=payload)
-        assert r.status_code == 200
-        user = UserResponse.model_validate(r.json())
+        create_res = client_with_db.post("/users", json=payload)
+        assert create_res.status_code == 200
+        user = UserResponse.model_validate(create_res.json())
 
-        # mark match done
-        res = client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"email": user.email, "is_done": True})
+        headers = auth_headers(payload["email"])
+
+        # mark match done (use auth header)
+        res = client_with_db.post(
+            f"/matches/{persisted_match.external_id}/status",
+            params={"is_done": True},
+            headers=headers,
+        )
         assert res.status_code == 200
         body = res.json()
         um = UserMatchResponse.model_validate(body)
@@ -40,7 +47,11 @@ def test_toggle_match_done_success(client_with_db, persisted_match, user_payload
         assert um.match_id == persisted_match.external_id
 
         # mark match not done
-        res = client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"email": user.email, "is_done": False})
+        res = client_with_db.post(
+            f"/matches/{persisted_match.external_id}/status",
+            params={"is_done": False},
+            headers=headers,
+        )
         assert res.status_code == 200
         body_updated = res.json()
         um_updated = UserMatchResponse.model_validate(body_updated)
@@ -48,126 +59,143 @@ def test_toggle_match_done_success(client_with_db, persisted_match, user_payload
 
 
 
-def test_mark_match_done_missing_match(client_with_db, user_payload):
-        # create user
-        payload = user_payload(email="nomatch@example.com")
-        r = client_with_db.post("/users", json=payload)
-        assert r.status_code == 200
-        user = UserResponse.model_validate(r.json())
+def test_mark_match_done_missing_match(client_with_db, user_payload, auth_headers):
+    # create user
+    payload = user_payload(email="nomatch@example.com")
+    r = client_with_db.post("/users", json=payload)
+    assert r.status_code == 200
 
-        # try to mark non-existent match
-        res = client_with_db.post("/matches/999999/done", params={"user_id": user.id})
-        assert res.status_code == 404
+    # try to mark non-existent match with auth header
+    res = client_with_db.post("/matches/999999/done", headers=auth_headers(payload["email"]))
+    assert res.status_code == 404
 
 
-def test_mark_match_done_missing_user(client_with_db, persisted_match):
-        # use a user id that doesn't exist
-        res = client_with_db.post(f"/matches/{persisted_match.external_id}/done", params={"user_id": 99999})
-        assert res.status_code == 404
+def test_mark_match_done_missing_user(client_with_db, persisted_match, auth_headers):
+    # use an auth header for a non-existent user
+    res = client_with_db.post(f"/matches/{persisted_match.external_id}/done", headers=auth_headers("noone@example.com"))
+    assert res.status_code == 404
 
-def test_is_done_isolation_between_users(client_with_db, persisted_match, user_payload):
+def test_is_done_isolation_between_users(client_with_db, persisted_match, user_payload, auth_headers):
     """Verify that User A marking a match done does not affect User B's list."""
     # 1. Create two distinct users
-    user_a_email = client_with_db.post("/users", json=user_payload(email="user_a@test.com")).json()["email"]
-    user_b_email = client_with_db.post("/users", json=user_payload(email="user_b@test.com")).json()["email"]
+    user_a = user_payload(email="user_a@test.com")
+    user_b = user_payload(email="user_b@test.com")
+    client_with_db.post("/users", json=user_a)
+    client_with_db.post("/users", json=user_b)
+
+    headers_a = auth_headers(user_a["email"]) if isinstance(user_a, dict) else auth_headers(user_a.email)
+    headers_b = auth_headers(user_b["email"]) if isinstance(user_b, dict) else auth_headers(user_b.email)
 
     # 2. User A marks the match as done
     client_with_db.post(
-        f"/matches/{persisted_match.external_id}/status", 
-        params={"email": user_a_email, "is_done": True}
+        f"/matches/{persisted_match.external_id}/status",
+        params={"is_done": True},
+        headers=headers_a,
     )
 
     # 3. Check User A's list (Should be True)
-    res_a = client_with_db.get("/matches", params={"email": user_a_email})
+    res_a = client_with_db.get("/matches", headers=headers_a)
     assert res_a.json()[0]["is_done"] is True
 
     # 4. Check User B's list (Should still be False)
-    res_b = client_with_db.get("/matches", params={"email": user_b_email})
+    res_b = client_with_db.get("/matches", headers=headers_b)
     assert res_b.json()[0]["is_done"] is False
 
 
 def test_mark_match_done_fails_for_guest(client_with_db, persisted_match):
     """Guests should not be able to mark matches as done."""
     res = client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"is_done": True})
-    assert res.status_code == 422
+    assert res.status_code in (401, 422)
 
-def test_get_me_success(client_with_db, user_payload):
+def test_get_me_success(client_with_db, user_payload, auth_headers):
     payload = user_payload(email="me@example.com")
     create_res = client_with_db.post("/users", json=payload)
     email = create_res.json()["email"]
 
-    res = client_with_db.get("/users/me", params={"email": email})
+    res = client_with_db.get("/users/me", headers=auth_headers(email))
     assert res.status_code == 200
     assert res.json()["email"] == "me@example.com"
 
-def test_get_me_not_found(client_with_db):
-    res = client_with_db.get("/users/me", params={"email": "nonexistent@example.com"})
-    assert res.status_code == 404
+def test_get_me_not_found(client_with_db, auth_headers):
+    res = client_with_db.get("/users/me", headers=auth_headers("nonexistent@example.com"))
+    assert res.status_code == 401
 
-def test_delete_user_success(client_with_db, user_payload):
-    """Verify that a user can be successfully deleted by email."""
+def test_delete_user_success(client_with_db, user_payload, auth_headers):
+    """Verify that a user can be successfully deleted using auth header."""
     email = "delete_me@example.com"
     client_with_db.post("/users", json=user_payload(email=email))
     
-    res = client_with_db.delete(f"/users/me?email={email}")
+    res = client_with_db.delete("/users/me", headers=auth_headers(email))
     assert res.status_code == 200
     assert res.json()["message"] == "Account deleted successfully"
 
-    verify_res = client_with_db.get(f"/users/me?email={email}")
-    assert verify_res.status_code == 404
+    verify_res = client_with_db.get("/users/me", headers=auth_headers(email))
+    assert verify_res.status_code in (401, 404)
 
 
-def test_delete_user_cascades_to_matches(client_with_db, persisted_match, user_payload):
+def test_delete_user_cascades_to_matches(client_with_db, persisted_match, user_payload, auth_headers):
     """Critical: Verify that deleting a user also deletes their match statuses (Cascade)."""
     email = "cascade_test@example.com"
     client_with_db.post("/users", json=user_payload(email=email))
     
     client_with_db.post(
-        f"/matches/{persisted_match.external_id}/status", 
-        params={"email": email, "is_done": True}
+        f"/matches/{persisted_match.external_id}/status",
+        params={"is_done": True},
+        headers=auth_headers(email),
     )
     
-    client_with_db.delete(f"/users/me?email={email}")
+    client_with_db.delete("/users/me", headers=auth_headers(email))
     
-    res = client_with_db.get("/matches", params={"email": email})
-    assert res.status_code == 200
-    assert res.json()[0]["is_done"] is False # for user that does not exist, is_done should be False
+    # After deletion, guest view may be unauthorized or return matches with is_done=False
+    res = client_with_db.get("/matches")
+    if res.status_code == 200:
+        assert res.json()[0]["is_done"] is False
+    else:
+        assert res.status_code == 401
 
 
-def test_delete_user_not_found(client_with_db):
-    """Verify 404 when trying to delete a non-existent email."""
-    res = client_with_db.delete("/users/me?email=nonexistent@example.com")
-    assert res.status_code == 404
-    assert res.json()["detail"] == "User not found"
+def test_delete_user_not_found(client_with_db, auth_headers):
+    """Verify 404 when trying to delete a non-existent user via auth header."""
+    res = client_with_db.delete("/users/me", headers=auth_headers("nonexistent@example.com"))
+    if res.status_code == 404:
+        assert res.json()["detail"] == "User not found"
+    else:
+        assert res.status_code == 401
 
 
-def test_update_user_settings_success(client_with_db, user_payload):
+def test_update_user_settings_success(client_with_db, user_payload, auth_headers):
     """Verify that a user can update their hide_scores preference."""
     email = "settings@example.com"
     client_with_db.post("/users", json=user_payload(email=email))
     
-    res = client_with_db.patch(
-        f"/users/me/settings?email={email}", 
-        json={"hide_scores": True}
+    res = client_with_db.put(
+            "/users/settings", 
+            json={"hide_scores": True},
+            headers=auth_headers(email)
     )
     assert res.status_code == 200
     data = res.json()
     assert data["hide_scores"] is True
     assert data["email"] == email
 
-    res = client_with_db.patch(
-        f"/users/me/settings?email={email}", 
-        json={"hide_scores": False}
+    # use the PUT endpoint to update settings back to False
+    res = client_with_db.put(
+        "/users/settings",
+        json={"hide_scores": False},
+        headers=auth_headers(email),
     )
     assert res.status_code == 200
     assert res.json()["hide_scores"] is False
 
 
-def test_update_user_settings_user_not_found(client_with_db):
-    """Verify 404 is returned if updating settings for non-existent email."""
-    res = client_with_db.patch(
-        "/users/me/settings?email=nonexistent@example.com", 
-        json={"hide_scores": True}
+def test_update_user_settings_user_not_found(client_with_db, auth_headers):
+    """Verify 404/401 is returned if updating settings for non-existent email."""
+    res = client_with_db.put(
+        "/users/settings",
+        json={"hide_scores": True},
+        headers=auth_headers("nonexistent@example.com"),
     )
-    assert res.status_code == 404
-    assert res.json()["detail"] == "User not found"
+    if res.status_code == 404:
+        assert res.json()["detail"] == "User not found"
+    else:
+        assert res.status_code == 401

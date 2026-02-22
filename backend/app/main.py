@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List, cast
 from contextlib import asynccontextmanager
 
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import literal
 
 from app.services.sync_service import get_sync_freshness, update_sync_metadata, get_last_sync_time
-from app.database import SessionLocal
+from app.database import get_db
 from app.models import Match as MatchModel, User as UserModel, UserMatch as UserMatchModel
 from app.scripts.sync_db import perform_sync
 from app.schemas import (
@@ -18,14 +19,9 @@ from app.schemas import (
     UserSettingsUpdate,
 )
 from sqlalchemy.exc import IntegrityError
+from app.utils.security import hash_password, verify_password, create_access_token, get_current_user
 
-def get_db():
-    """Dependency that provides a SQLAlchemy session and closes it after use."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+
 
 @asynccontextmanager
 async def lifespan(app):
@@ -68,34 +64,26 @@ async def health_check():
 
 
 @app.get("/matches", response_model=List[MatchSchema])
-def read_matches(email: str | None = None, 
-                hide_done: bool = False, 
-                limit: int = 20, 
-                offset: int = 0, 
-                db: Session = Depends(get_db)
-    ):
+def read_matches(
+    hide_done: bool = False, 
+    limit: int = 20, 
+    offset: int = 0, 
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user) # Now required & secure
+):
     """
-    Return all matches persisted in the local database.
-    Fetch all matches and check if they are 'done' for a specific user using a single efficient SQL JOIN.
+    Return matches and check if they are 'done' for the logged-in user.
     """
     try:
-        user_id: int | None = None
-        if email:
-            user = db.query(UserModel).filter(UserModel.email == email).first()
-            if user:
-                user_id = cast(int, user.id)
-        
+        user_id = cast(int, current_user.id)
         query = db.query(MatchModel, UserMatchModel.is_done)
         
-        if user_id:
-            query = query.outerjoin(UserMatchModel, 
-                                    (MatchModel.id == UserMatchModel.match_id) & 
-                                    (UserMatchModel.user_id == user_id)
-            )
-        else:
-            query = query.outerjoin(UserMatchModel, literal(False))
+        query = query.outerjoin(UserMatchModel, 
+                                (MatchModel.id == UserMatchModel.match_id) & 
+                                (UserMatchModel.user_id == user_id)
+        )
 
-        if hide_done and user_id:
+        if hide_done:
             query = query.filter(
                 (UserMatchModel.is_done == False) | (UserMatchModel.is_done == None)
             )
@@ -111,8 +99,8 @@ def read_matches(email: str | None = None,
         return results
     except Exception as e:
         print(f"Error reading matches from DB: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
 
 @app.post("/users", response_model=UserResponse)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
@@ -121,19 +109,35 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed = f"hashed_{user.password}"
-    u = UserModel(email=user.email, hashed_password=hashed)
-    db.add(u)
+    hashed_pwd = hash_password(user.password)
+    new_user = UserModel(email=user.email, hashed_password=hashed_pwd, is_active=True)
+    db.add(new_user)
     try:
         db.commit()
-        db.refresh(u)
+        db.refresh(new_user)
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    return UserResponse.model_validate(u)
+    return new_user
 
+@app.post("/token")
+def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: Session = Depends(get_db)
+):
+    # Find user by email (OAuth2 uses 'username' field for the login ID)
+    user = db.query(UserModel).filter(UserModel.email == form_data.username).first()
+    
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=401, 
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
+    access_token = create_access_token(subject=user.email)
+    return {"access_token": access_token, "token_type": "bearer"}
 
 is_syncing_globally = False
 
@@ -172,65 +176,59 @@ def get_sync_status(db: Session = Depends(get_db)):
     }
 
 @app.get("/users/me", response_model=UserResponse)
-def read_user_me(email: str, db: Session = Depends(get_db)):
+def read_user_me(current_user: UserModel = Depends(get_current_user)):
     """
-    Fetch the current user's profile. Frontend uses this to verify if the saved email is still valid.
+    Fetch the current user's profile using their JWT token.
     """
-    user = db.query(UserModel).filter(UserModel.email == email).first()
-    if not user:
-        raise HTTPException(
-            status_code=404, 
-            detail="User not found. Please log in again."
-        )
-    return user
+    return current_user
 
 @app.delete("/users/me")
-def delete_user(email: str, db: Session = Depends(get_db)):
-    user = db.query(UserModel).filter(UserModel.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    db.delete(user) # Delete user will cascade to UserMatchModel due to foreign key constraints
+def delete_user(
+    db: Session = Depends(get_db), 
+    current_user: UserModel = Depends(get_current_user)
+):
+    db.delete(current_user) 
     db.commit()
     return {"message": "Account deleted successfully"}
 
-@app.patch("/users/me/settings", response_model=UserResponse)
+@app.put("/users/settings", response_model=UserResponse)
 def update_user_settings(
     settings: UserSettingsUpdate, 
-    email: str, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
 ):
-    """Update user preferences like hide_scores."""
-    user = db.query(UserModel).filter(UserModel.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    """Update user preferences like hide_scores securely."""
+    current_user.hide_scores = settings.hide_scores
     
-    user.hide_scores = settings.hide_scores
     db.commit()
-    db.refresh(user)
-    return user
+    db.refresh(current_user)
+    return current_user
 
 @app.post("/matches/{match_id}/status", response_model=UserMatchResponse)
-def toggle_match_done(match_id: int, email: str, is_done: bool, db: Session = Depends(get_db)):
+def toggle_match_done(
+    match_id: int, 
+    is_done: bool, 
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user) # Securely identified
+):
     """Mark a match as done for a given user. `match_id` is the external_id."""
     match = db.query(MatchModel).filter(MatchModel.external_id == match_id).first()
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
 
-    # ensure user exists
-    user = db.query(UserModel).filter(UserModel.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user_match = db.query(UserMatchModel).filter(
+        UserMatchModel.user_id == current_user.id, 
+        UserMatchModel.match_id == match.id
+    ).first()
 
-    user_match = db.query(UserMatchModel).filter(UserMatchModel.user_id == user.id, UserMatchModel.match_id == match.id).first()
     if user_match:
            user_match.is_done = is_done
     else:
-        user_match = UserMatchModel(user_id=user.id, match_id=match.id, is_done=is_done)
+        user_match = UserMatchModel(user_id=current_user.id, match_id=match.id, is_done=is_done)
         db.add(user_match)
 
     db.commit()
-    return UserMatchResponse(user_id=cast(int, user.id), match_id=match_id, is_done=is_done)
+    return UserMatchResponse(user_id=cast(int, current_user.id), match_id=match_id, is_done=is_done)
 
 
 if __name__ == "__main__":

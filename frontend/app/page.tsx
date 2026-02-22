@@ -13,7 +13,7 @@ interface SyncStatus {
 }
 
 export default function Home() {
-  const { userEmail, logout, hideScores, setHideScores } = useUser();
+  const { token, logout, hideScores, setHideScores } = useUser();
   const [matches, setMatches] = useState<Match[]>([]);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -22,14 +22,15 @@ export default function Home() {
   const LIMIT = 20;
 
   const fetchMatches = useCallback(async (currentOffset: number) => {
-    if (!userEmail) return;
+    if (!token) return;
     if (currentOffset > 0) {
       setLoading(true);
     }
     try {
       // Fetching with limit and offset from your FastAPI parameters
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/matches?email=${userEmail}&limit=${LIMIT}&offset=${currentOffset}&hide_done=${hideDone}`
+        `${process.env.NEXT_PUBLIC_API_URL}/matches?limit=${LIMIT}&offset=${currentOffset}&hide_done=${hideDone}`,
+        {headers: {'Authorization': `Bearer ${token}`}}
       );
       const newData = await res.json();
       
@@ -46,7 +47,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [userEmail, hideDone]);
+  }, [token, hideDone]);
 
   const visibleMatches = hideDone ? matches.filter(match => !match.is_done) : matches;
 
@@ -76,7 +77,7 @@ export default function Home() {
 
 
   useEffect(() => {
-    if (userEmail) {
+    if (token) {
       setMatches([]); // Clear matches when user changes
       setOffset(0);
       fetchMatches(0);
@@ -85,7 +86,7 @@ export default function Home() {
       const interval = setInterval(() => {fetchSyncStatus();}, 30000); // Check every 30 seconds
       return () => clearInterval(interval); // Cleanup on unmount
     }
-  }, [userEmail, fetchMatches, fetchSyncStatus]);
+  }, [token, fetchMatches, fetchSyncStatus]);
 
   useEffect(() => {
     setOffset(0);
@@ -93,13 +94,13 @@ export default function Home() {
   }, [hideDone]);
 
   useEffect(() => {
-    if (!userEmail) {
+    if (!token) {
       setMatches([]);
       setOffset(0);
     }
-  }, [userEmail]);
+  }, [token]);
 
-  if (!userEmail) {
+  if (!token) {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50">
           <div className="p-8 bg-white rounded-2xl shadow-xl border w-full max-w-md text-center">
@@ -126,8 +127,9 @@ export default function Home() {
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/me?email=${userEmail}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/me`, {
         method: 'DELETE',
+        headers: {'Authorization': `Bearer ${token}`}
       });
 
       if (res.ok) {
@@ -151,7 +153,7 @@ export default function Home() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Matches</h1>
             <p className="text-sm text-slate-500 font-medium">
-              Logged in as <span className="text-slate-700">{userEmail}</span>
+              Logged in
             </p>
           </div>
           

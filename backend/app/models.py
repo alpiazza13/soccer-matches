@@ -52,9 +52,10 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    is_active = Column(Boolean, default=True)
+    email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False) # For email verification
     hide_scores: Mapped[bool] = mapped_column(Boolean, default=False)
 
     user_matches = relationship("UserMatch", back_populates="user", cascade="all, delete-orphan")

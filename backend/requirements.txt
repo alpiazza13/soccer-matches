@@ -16,6 +16,12 @@ pytest-asyncio
 pytest-cov
 httpx
 
+# Security
+passlib[bcrypt]    # For secure password hashing
+bcrypt==4.0.1
+python-jose[cryptography]  # For generating and verifying JWT tokens
+python-multipart # Required by FastAPI to handle login form data
+
 
 
 

@@ -14,6 +14,7 @@ from app.database import Base
 from app.models import Team, Match, Competition
 
 from app.utils.time_provider import TimeProvider, DatetimeProvider
+from app.utils.security import create_access_token
 from app.schemas import CompetitionSchema, TeamSchema, MatchSchema, ScoreSchema, ScoreValues, UserCreate
 from fastapi.testclient import TestClient
 from app.main import app, get_db
@@ -256,3 +257,11 @@ def persisted_match(db_session) -> Match:
     db_session.commit()
     db_session.refresh(match)
     return match
+
+@pytest.fixture
+def auth_headers():
+    """Helper to generate Bearer token headers for a user."""
+    def _make(email: str):
+        token = create_access_token(subject=email)
+        return {"Authorization": f"Bearer {token}"}
+    return _make

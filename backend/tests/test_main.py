@@ -56,16 +56,18 @@ class TestHealthEndpoint:
         assert data["status"] == "healthy"
 
 
-def test_matches_endpoint_empty(client_with_db):
+def test_matches_endpoint_empty(client_with_db, user_payload, auth_headers):
     """GET /matches should return an empty list when DB has no matches."""
-    res = client_with_db.get("/matches", params={"user_id": 1})
+    user_email = client_with_db.post("/users", json=user_payload()).json()["email"]
+    res = client_with_db.get("/matches", headers=auth_headers(user_email))
     assert res.status_code == 200
     assert res.json() == []
 
 
-def test_matches_endpoint_returns_match(client_with_db, persisted_match):
+def test_matches_endpoint_returns_match(client_with_db, persisted_match, user_payload, auth_headers):
     """GET /matches should return serialized matches from DB using MatchSchema."""
-    res = client_with_db.get("/matches")
+    user_email = client_with_db.post("/users", json=user_payload()).json()["email"]
+    res = client_with_db.get("/matches", headers=auth_headers(user_email))
     assert res.status_code == 200
     body = res.json()
     assert isinstance(body, list) and len(body) == 1
@@ -74,47 +76,54 @@ def test_matches_endpoint_returns_match(client_with_db, persisted_match):
     expected_id = persisted_match.external_id
     assert body[0]["external_id"] == expected_id
 
-def test_read_matches_with_is_done_status(client_with_db, persisted_match, user_payload):
+def test_read_matches_with_is_done_status(client_with_db, persisted_match, user_payload, auth_headers):
     """Verify that the match list correctly reflects the is_done status for a specific user."""
     user_res = client_with_db.post("/users", json=user_payload())
     user_email = user_res.json()["email"]
 
-    res_before = client_with_db.get("/matches", params={"email": user_email})
+    res_before = client_with_db.get("/matches", headers=auth_headers(user_email))
     assert res_before.json()[0]["is_done"] is False
 
     # Mark  match as done
-    client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"email": user_email, "is_done": True})
+    client_with_db.post(
+        f"/matches/{persisted_match.external_id}/status",
+        params={"is_done": True},
+        headers=auth_headers(user_email),
+    )
 
-    res_after = client_with_db.get("/matches", params={"email": user_email})
+    res_after = client_with_db.get("/matches", headers=auth_headers(user_email))
     assert res_after.json()[0]["is_done"] is True
 
 
 def test_read_matches_guest_access(client_with_db, persisted_match):
     """Verify that omitting user_id allows guest access with is_done=False."""
     res = client_with_db.get("/matches")
-    
-    assert res.status_code == 200
-    data = res.json()
-    assert len(data) == 1
-    assert data[0]["is_done"] is False
 
-def test_read_matches_pagination_and_filtering(client_with_db, persisted_match, user_payload):
+    # With JWT auth required, guest access should be unauthorized
+    assert res.status_code == 401
+
+def test_read_matches_pagination_and_filtering(client_with_db, persisted_match, user_payload, auth_headers):
     user_email = client_with_db.post("/users", json=user_payload()).json()["email"]
     
-    res_limit = client_with_db.get("/matches", params={"email": user_email, "limit": 0})
+    res_limit = client_with_db.get("/matches", params={"limit": 0}, headers=auth_headers(user_email))
     assert len(res_limit.json()) == 0
 
-    client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"email": user_email, "is_done": True})
+    client_with_db.post(
+        f"/matches/{persisted_match.external_id}/status",
+        params={"is_done": True},
+        headers=auth_headers(user_email),
+    )
 
-    res_show = client_with_db.get("/matches", params={"email": user_email, "hide_done": False})
+    res_show = client_with_db.get("/matches", params={"hide_done": False}, headers=auth_headers(user_email))
     assert len(res_show.json()) == 1
 
-    res_hide = client_with_db.get("/matches", params={"email": user_email, "hide_done": True})
+    res_hide = client_with_db.get("/matches", params={"hide_done": True}, headers=auth_headers(user_email))
     assert len(res_hide.json()) == 0
 
-def test_matches_pagination_offset(client_with_db, persisted_match):
+def test_matches_pagination_offset(client_with_db, persisted_match, user_payload, auth_headers):
     """Verify that an offset greater than total records returns an empty list."""
-    res = client_with_db.get("/matches", params={"offset": 10})
+    user_email = client_with_db.post("/users", json=user_payload()).json()["email"]
+    res = client_with_db.get("/matches", params={"offset": 10}, headers=auth_headers(user_email))
     assert res.status_code == 200
     assert res.json() == []
 
@@ -123,7 +132,7 @@ def test_matches_pagination_offset(client_with_db, persisted_match):
 class TestSyncEndpoint:
     """Test suite for the manual database sync endpoint."""
 
-    def test_trigger_sync_success(self, client_with_db, monkeypatch):
+    def test_trigger_sync_success(self, client_with_db, monkeypatch, user_payload, auth_headers):
         """Verify the endpoint returns success when the sync function completes."""
         mock_perform = MagicMock()
         monkeypatch.setattr("app.main.get_sync_freshness", lambda db, key: False)
@@ -131,7 +140,9 @@ class TestSyncEndpoint:
         monkeypatch.setattr("app.main.update_sync_metadata", MagicMock())
         monkeypatch.setattr("app.main.is_syncing_globally", False)
         
-        response = client_with_db.post("/api/matches/sync")
+        # create a user and get auth headers
+        user_email = client_with_db.post("/users", json=user_payload()).json()["email"]
+        response = client_with_db.post("/api/matches/sync", headers=auth_headers(user_email))
         
         assert response.status_code == 200
         assert response.json() == {
@@ -140,19 +151,20 @@ class TestSyncEndpoint:
         }
         mock_perform.assert_called_once()
 
-    def test_trigger_sync_skipped_when_fresh(self, client_with_db, monkeypatch):
+    def test_trigger_sync_skipped_when_fresh(self, client_with_db, monkeypatch, user_payload, auth_headers):
         """Verify sync is skipped if the service says data is already fresh."""
         mock_perform = MagicMock()
         monkeypatch.setattr("app.main.get_sync_freshness", lambda db, key: True)
         monkeypatch.setattr("app.main.perform_sync", mock_perform)
         
-        response = client_with_db.post("/api/matches/sync")
+        user_email = client_with_db.post("/users", json=user_payload()).json()["email"]
+        response = client_with_db.post("/api/matches/sync", headers=auth_headers(user_email))
         
         assert response.status_code == 200
         assert "already fresh" in response.json()["message"]
         mock_perform.assert_not_called()
 
-    def test_trigger_sync_failure_releases_lock(self, client_with_db, monkeypatch):
+    def test_trigger_sync_failure_releases_lock(self, client_with_db, monkeypatch, user_payload, auth_headers):
         """Verify lock is released and metadata updated on failure."""
         mock_perform = MagicMock(side_effect=Exception("API Down"))
         mock_update = MagicMock()
@@ -161,12 +173,15 @@ class TestSyncEndpoint:
         monkeypatch.setattr("app.main.perform_sync", mock_perform)
         monkeypatch.setattr("app.main.update_sync_metadata", mock_update)
         
-        # Mock DB methods to prevent transaction deassociation warnings
+        monkeypatch.setattr("app.main.is_syncing_globally", False)
+        # create the user before monkeypatching Session methods
+        user_email = client_with_db.post("/users", json=user_payload()).json()["email"]
+
+        # Mock DB methods to prevent transaction deassociation warnings (after user creation)
         monkeypatch.setattr("sqlalchemy.orm.Session.rollback", lambda x: None)
         monkeypatch.setattr("sqlalchemy.orm.Session.commit", lambda x: None)
-        
-        monkeypatch.setattr("app.main.is_syncing_globally", False)
-        response = client_with_db.post("/api/matches/sync")
+
+        response = client_with_db.post("/api/matches/sync", headers=auth_headers(user_email))
         assert response.status_code == 500
         
         # Verify metadata was updated with FAILED status
@@ -174,25 +189,27 @@ class TestSyncEndpoint:
 
         # Verify lock was released by trying a second successful request
         mock_perform.side_effect = None
-        response_two = client_with_db.post("/api/matches/sync")
+        response_two = client_with_db.post("/api/matches/sync", headers=auth_headers(user_email))
         assert response_two.status_code == 200
 
-    def test_trigger_sync_already_in_progress(self, client_with_db, monkeypatch):
+    def test_trigger_sync_already_in_progress(self, client_with_db, monkeypatch, user_payload, auth_headers):
         """Verify 429 is returned if the global lock is already active."""
         monkeypatch.setattr("app.main.is_syncing_globally", True)
-        response = client_with_db.post("/api/matches/sync")
+        user_email = client_with_db.post("/users", json=user_payload()).json()["email"]
+        response = client_with_db.post("/api/matches/sync", headers=auth_headers(user_email))
         assert response.status_code == 429
         assert "already in progress" in response.json()["detail"]
 
-    def test_get_sync_status_empty(self, client_with_db):
+    def test_get_sync_status_empty(self, client_with_db, user_payload, auth_headers):
         """Verify status endpoint when no sync has ever run."""
-        response = client_with_db.get("/api/matches/sync/status")
+        user_email = client_with_db.post("/users", json=user_payload()).json()["email"]
+        response = client_with_db.get("/api/matches/sync/status", headers=auth_headers(user_email))
         assert response.status_code == 200
         data = response.json()
         assert data["last_run_at"] is None
         assert data["is_fresh"] is False
 
-    def test_get_sync_status_populated(self, client_with_db, monkeypatch):
+    def test_get_sync_status_populated(self, client_with_db, monkeypatch, user_payload, auth_headers):
         """Verify status endpoint returns correct metadata."""
         fixed_now = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         
@@ -200,7 +217,8 @@ class TestSyncEndpoint:
         monkeypatch.setattr("app.main.get_last_sync_time", lambda db, key: fixed_now)
         monkeypatch.setattr("app.main.get_sync_freshness", lambda db, key: True)
         
-        response = client_with_db.get("/api/matches/sync/status")
+        user_email = client_with_db.post("/users", json=user_payload()).json()["email"]
+        response = client_with_db.get("/api/matches/sync/status", headers=auth_headers(user_email))
         assert response.status_code == 200
         data = response.json()
         # ISO format check

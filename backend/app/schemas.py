@@ -55,8 +55,17 @@ class MatchSchema(BaseModel):
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str | None = None
+    password: str
 
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    email: str | None = None
+    
 
 class UserResponse(BaseModel):
     id: int
