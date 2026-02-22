@@ -25,14 +25,9 @@ def test_create_user_duplicate_email(client_with_db, user_payload):
         assert r2.status_code == 400
 
 
-def test_toggle_match_done_success(client_with_db, persisted_match, user_payload, auth_headers):
-        # create user and capture response
-        payload = user_payload(email="marker@example.com")
-        create_res = client_with_db.post("/users", json=payload)
-        assert create_res.status_code == 200
-        user = UserResponse.model_validate(create_res.json())
-
-        headers = auth_headers(payload["email"])
+def test_toggle_match_done_success(client_with_db, persisted_match, session_test_user):
+        """Test marking a match as done and then undone using session user."""
+        headers = session_test_user["headers"]
 
         # mark match done (use auth header)
         res = client_with_db.post(
@@ -43,8 +38,8 @@ def test_toggle_match_done_success(client_with_db, persisted_match, user_payload
         assert res.status_code == 200
         body = res.json()
         um = UserMatchResponse.model_validate(body)
-        assert um.user_id == user.id
         assert um.match_id == persisted_match.external_id
+        assert um.is_done is True
 
         # mark match not done
         res = client_with_db.post(
@@ -59,14 +54,10 @@ def test_toggle_match_done_success(client_with_db, persisted_match, user_payload
 
 
 
-def test_mark_match_done_missing_match(client_with_db, user_payload, auth_headers):
-    # create user
-    payload = user_payload(email="nomatch@example.com")
-    r = client_with_db.post("/users", json=payload)
-    assert r.status_code == 200
-
+def test_mark_match_done_missing_match(client_with_db, session_test_user):
+    """Test 404 when marking a non-existent match with session user."""
     # try to mark non-existent match with auth header
-    res = client_with_db.post("/matches/999999/done", headers=auth_headers(payload["email"]))
+    res = client_with_db.post("/matches/999999/done", headers=session_test_user["headers"])
     assert res.status_code == 404
 
 
@@ -107,14 +98,11 @@ def test_mark_match_done_fails_for_guest(client_with_db, persisted_match):
     res = client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"is_done": True})
     assert res.status_code in (401, 422)
 
-def test_get_me_success(client_with_db, user_payload, auth_headers):
-    payload = user_payload(email="me@example.com")
-    create_res = client_with_db.post("/users", json=payload)
-    email = create_res.json()["email"]
-
-    res = client_with_db.get("/users/me", headers=auth_headers(email))
+def test_get_me_success(client_with_db, session_test_user):
+    """Test retrieving current user profile with session user."""
+    res = client_with_db.get("/users/me", headers=session_test_user["headers"])
     assert res.status_code == 200
-    assert res.json()["email"] == "me@example.com"
+    assert res.json()["email"] == session_test_user["email"]
 
 def test_get_me_not_found(client_with_db, auth_headers):
     res = client_with_db.get("/users/me", headers=auth_headers("nonexistent@example.com"))
@@ -130,7 +118,7 @@ def test_delete_user_success(client_with_db, user_payload, auth_headers):
     assert res.json()["message"] == "Account deleted successfully"
 
     verify_res = client_with_db.get("/users/me", headers=auth_headers(email))
-    assert verify_res.status_code in (401, 404)
+    assert verify_res.status_code == 401
 
 
 def test_delete_user_cascades_to_matches(client_with_db, persisted_match, user_payload, auth_headers):

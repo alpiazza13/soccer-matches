@@ -14,7 +14,7 @@ from app.database import Base
 from app.models import Team, Match, Competition
 
 from app.utils.time_provider import TimeProvider, DatetimeProvider
-from app.utils.security import create_access_token
+from app.utils.security import create_access_token, hash_password
 from app.schemas import CompetitionSchema, TeamSchema, MatchSchema, ScoreSchema, ScoreValues, UserCreate
 from fastapi.testclient import TestClient
 from app.main import app, get_db
@@ -257,6 +257,36 @@ def persisted_match(db_session) -> Match:
     db_session.commit()
     db_session.refresh(match)
     return match
+
+@pytest.fixture(scope="session")
+def session_test_user():
+    """Create a single test user once per test session and return auth headers.
+
+    This inserts a user row into the session-scoped test database created by
+    `setup_test_database` so function-scoped transactional tests can see it.
+    """
+    from app.models import User
+
+    email = "session_test_user@example.com"
+    password = "testpassword"
+
+    # Open a direct connection to the test engine and insert the user if missing
+    conn = test_engine.connect()
+    session = Session(bind=conn)
+    try:
+        existing = session.query(User).filter(User.email == email).first()
+        if not existing:
+            user = User(email=email, hashed_password=hash_password(password), is_active=True, is_verified=True)
+            session.add(user)
+            session.commit()
+        else:
+            user = existing
+    finally:
+        session.close()
+        conn.close()
+
+    token = create_access_token(subject=email)
+    return {"email": email, "password": password, "headers": {"Authorization": f"Bearer {token}"}}
 
 @pytest.fixture
 def auth_headers():
