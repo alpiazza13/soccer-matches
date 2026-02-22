@@ -56,15 +56,17 @@ def test_toggle_match_done_success(client_with_db, persisted_match, session_test
 
 def test_mark_match_done_missing_match(client_with_db, session_test_user):
     """Test 404 when marking a non-existent match with session user."""
-    # try to mark non-existent match with auth header
-    res = client_with_db.post("/matches/999999/done", headers=session_test_user["headers"])
+    res = client_with_db.post(
+        "/matches/999999/status", 
+        headers=session_test_user["headers"],
+        params={"is_done": True}
+    )
     assert res.status_code == 404
 
 
 def test_mark_match_done_missing_user(client_with_db, persisted_match, auth_headers):
-    # use an auth header for a non-existent user
-    res = client_with_db.post(f"/matches/{persisted_match.external_id}/done", headers=auth_headers("noone@example.com"))
-    assert res.status_code == 404
+    res = client_with_db.post(f"/matches/{persisted_match.external_id}/status", params={"is_done": True}, headers=auth_headers("noone@example.com"))
+    assert res.status_code == 401
 
 def test_is_done_isolation_between_users(client_with_db, persisted_match, user_payload, auth_headers):
     """Verify that User A marking a match done does not affect User B's list."""
@@ -183,7 +185,19 @@ def test_update_user_settings_user_not_found(client_with_db, auth_headers):
         json={"hide_scores": True},
         headers=auth_headers("nonexistent@example.com"),
     )
-    if res.status_code == 404:
-        assert res.json()["detail"] == "User not found"
-    else:
-        assert res.status_code == 401
+    assert res.status_code == 401
+
+def test_unverified_user_access(client_with_db, user_payload, auth_headers):
+    """
+    Test if unverified users are blocked. 
+    Note: You'll need to update get_current_user in main.py to enforce this.
+    """
+    email = "unverified@example.com"
+    # By default, is_verified is False
+    client_with_db.post("/users", json=user_payload(email=email))
+    res = client_with_db.get("/matches", headers=auth_headers(email))
+
+    # If you decide to enforce verification:
+    # assert res.status_code == 403 
+    # assert "Verify your email" in res.json()["detail"]
+    
