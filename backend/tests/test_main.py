@@ -123,6 +123,35 @@ def test_matches_pagination_offset(client_with_db, persisted_match, session_test
     assert res.status_code == 200
     assert res.json() == []
 
+class TestValidationErrorHandler:
+
+    def test_validation_error_handler_formats_cleanly(self, client_with_db, user_payload):
+        """
+        Verify that the custom exception handler in main.py 
+        transforms raw Pydantic errors into a clean string.
+        """
+        # 1. Test invalid email format
+        payload = user_payload(email="not-an-email", password="password123")
+        res = client_with_db.post("/users", json=payload)
+        
+        assert res.status_code == 422
+        # Verify the handler's custom string is present
+        assert res.json()["detail"] == "Please enter a valid email address."
+
+        # 2. Test a generic Pydantic error (short password)
+        payload_short = user_payload(email="valid@test.com", password="123")
+        res_short = client_with_db.post("/users", json=payload_short)
+        
+        assert res_short.status_code == 422
+        # Verify it uses the "Invalid field: msg" format
+        assert "Invalid password" in res_short.json()["detail"]
+
+    def test_empty_request_validation(self, client_with_db):
+        res = client_with_db.post("/users", json={})
+        assert res.status_code == 422
+        # Should say something like "Invalid email: Field required" 
+        # based on your current handler logic.
+        assert "Invalid" in res.json()["detail"]
 
 
 class TestSyncEndpoint:
