@@ -1,11 +1,15 @@
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
 from typing import List, cast
 from contextlib import asynccontextmanager
 
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import literal
+from sqlalchemy.exc import IntegrityError
+
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.services.sync_service import get_sync_freshness, update_sync_metadata, get_last_sync_time
 from app.database import get_db
@@ -18,7 +22,6 @@ from app.schemas import (
     UserMatchResponse,
     UserSettingsUpdate,
 )
-from sqlalchemy.exc import IntegrityError
 from app.utils.security import hash_password, verify_password, create_access_token, get_current_user
 
 
@@ -229,6 +232,36 @@ def toggle_match_done(
 
     db.commit()
     return UserMatchResponse(user_id=cast(int, current_user.id), match_id=match_id, is_done=is_done)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    """
+    Overrides the default 422 error response to provide a 
+    cleaner message for the frontend.
+    """
+    errors = exc.errors()
+    if not errors:
+        return JSONResponse(status_code=422, content={"detail": "Validation error"})
+
+    # Grab the first error in the list
+    first_error = errors[0]
+    
+    # field name is usually the last item in the 'loc' tuple (e.g., 'email' or 'password')
+    field = str(first_error.get("loc", ["field"])[-1])
+    msg = first_error.get("msg", "Invalid value")
+
+    # Simplify common Pydantic messages
+    if "value is not a valid email address" in msg:
+        clean_message = "Please enter a valid email address."
+    else:
+        clean_message = f"Invalid {field}: {msg}"
+
+    return JSONResponse(
+        status_code=422,
+        content={"detail": clean_message},
+    )
+
 
 
 if __name__ == "__main__":

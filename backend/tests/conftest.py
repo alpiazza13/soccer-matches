@@ -149,9 +149,12 @@ def user_payload():
     """
     counter = itertools.count(1)
 
-    def _make(email: str | None = None, password: str = "pw"):
+    def _make(email: str | None = None, password: str = "password"):
         i = next(counter)
-        return UserCreate(email=email or f"user{i}@example.com", password=password).model_dump()
+        return {
+            "email": email or f"user{i}@example.com",
+            "password": password
+        }
 
     return _make
 

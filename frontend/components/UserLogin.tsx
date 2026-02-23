@@ -9,6 +9,7 @@ export default function UserLogin() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const formatError = (data: any) => {
       return typeof data.detail === 'string' 
@@ -18,6 +19,12 @@ export default function UserLogin() {
 
   const handleLogin = async () => {
     setError(null);
+    setSuccess(null);
+
+    if (!email || !password) {
+      setError("Please enter both an email and a password to login.");
+      return;
+    }
     
     // OAuth2PasswordRequestForm expects x-www-form-urlencoded data
     const formData = new URLSearchParams();
@@ -44,8 +51,15 @@ export default function UserLogin() {
 
 const handleCreate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+
+    if (!email || !password) {
+      setError("Please enter both an email and a password to create an account.");
+      return;
+    }
+
     setError(null);
-    if (!email) return;
+    setSuccess(null)
+    
     try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
           method: 'POST',
@@ -54,6 +68,8 @@ const handleCreate = async (e?: React.FormEvent) => {
         });
       const data = await res.json();
       if (res.ok) {
+        setSuccess("Account created successfully! You can now Sign In.");
+        setPassword('');
         setToken(data.access_token);
       } else {
         setError(formatError(data) || "Could not create user.");
@@ -65,6 +81,20 @@ const handleCreate = async (e?: React.FormEvent) => {
 
 return (
     <div className="space-y-6">
+
+    {/* Sucess and Error Messages */}
+    {success && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm font-medium">
+            {success}
+          </div>
+        )}
+
+    {error && (
+      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm font-medium">
+        {error}
+      </div>
+    )}
+
       {/* Email Field */}
       <div>
         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">
@@ -122,15 +152,9 @@ return (
           onClick={handleCreate}
           className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-500 transition-colors"
         >
-          Create New
+          Create Account
         </button>
       </div>
-
-      {error && (
-        <p className="text-red-500 text-sm bg-red-50 p-2 rounded border border-red-100">
-          {error}
-        </p>
-      )}
     </div>
   );
 }

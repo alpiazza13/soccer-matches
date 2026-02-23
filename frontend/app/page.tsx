@@ -104,8 +104,8 @@ export default function Home() {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50">
           <div className="p-8 bg-white rounded-2xl shadow-xl border w-full max-w-md text-center">
-            <h1 className="text-2xl font-bold mb-4">Welcome back</h1>
-            <p className="text-slate-500 mb-6 text-sm">Login with your email to view your matches.</p>
+            <h1 className="text-2xl font-bold mb-4">Welcome</h1>
+            <p className="text-slate-500 mb-6 text-sm">Login or create an account to view your matches.</p>
             <UserLogin />
           </div>
         </div>

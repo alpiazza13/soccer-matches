@@ -7,50 +7,56 @@ from tests.conftest import auth_headers
 
 
 def test_create_user_success(client_with_db, user_payload):
-        payload = user_payload()
-        res = client_with_db.post("/users", json=payload)
-        assert res.status_code == 200
-        body = res.json()
-        user = UserResponse.model_validate(body)
-        assert user.id
-        assert user.email == payload["email"]
-        assert "password" not in body
+    payload = user_payload()
+    res = client_with_db.post("/users", json=payload)
+    assert res.status_code == 200
+    body = res.json()
+    user = UserResponse.model_validate(body)
+    assert user.id
+    assert user.email == payload["email"]
+    assert "password" not in body
 
 
 def test_create_user_duplicate_email(client_with_db, user_payload):
-        payload = user_payload(email="dup@example.com")
-        r1 = client_with_db.post("/users", json=payload)
-        assert r1.status_code == 200
-        r2 = client_with_db.post("/users", json=payload)
-        assert r2.status_code == 400
+    payload = user_payload(email="dup@example.com")
+    r1 = client_with_db.post("/users", json=payload)
+    assert r1.status_code == 200
+    r2 = client_with_db.post("/users", json=payload)
+    assert r2.status_code == 400
+
+def test_create_user_password_too_short(client_with_db, user_payload):
+    payload = user_payload(email="email@example.com", password="pw")
+    r1 = client_with_db.post("/users", json=payload)
+    assert r1.status_code == 422
+    assert "password" in r1.json()["detail"].lower()
 
 
 def test_toggle_match_done_success(client_with_db, persisted_match, session_test_user):
-        """Test marking a match as done and then undone using session user."""
-        headers = session_test_user["headers"]
+    """Test marking a match as done and then undone using session user."""
+    headers = session_test_user["headers"]
 
-        # mark match done (use auth header)
-        res = client_with_db.post(
-            f"/matches/{persisted_match.external_id}/status",
-            params={"is_done": True},
-            headers=headers,
-        )
-        assert res.status_code == 200
-        body = res.json()
-        um = UserMatchResponse.model_validate(body)
-        assert um.match_id == persisted_match.external_id
-        assert um.is_done is True
+    # mark match done (use auth header)
+    res = client_with_db.post(
+        f"/matches/{persisted_match.external_id}/status",
+        params={"is_done": True},
+        headers=headers,
+    )
+    assert res.status_code == 200
+    body = res.json()
+    um = UserMatchResponse.model_validate(body)
+    assert um.match_id == persisted_match.external_id
+    assert um.is_done is True
 
-        # mark match not done
-        res = client_with_db.post(
-            f"/matches/{persisted_match.external_id}/status",
-            params={"is_done": False},
-            headers=headers,
-        )
-        assert res.status_code == 200
-        body_updated = res.json()
-        um_updated = UserMatchResponse.model_validate(body_updated)
-        assert um_updated.is_done is False
+    # mark match not done
+    res = client_with_db.post(
+        f"/matches/{persisted_match.external_id}/status",
+        params={"is_done": False},
+        headers=headers,
+    )
+    assert res.status_code == 200
+    body_updated = res.json()
+    um_updated = UserMatchResponse.model_validate(body_updated)
+    assert um_updated.is_done is False
 
 
 
