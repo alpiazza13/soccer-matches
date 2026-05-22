@@ -1,4 +1,4 @@
 # sync_db settings
 DEFAULT_SYNC_START_DATE = "2025-12-30"
-LOOKBACK_DAYS = 2
+LOOKBACK_DAYS = 7
 

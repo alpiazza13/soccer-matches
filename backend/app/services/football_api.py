@@ -121,6 +121,8 @@ class FootballAPIClient:
         if date_from is None:
             date_from = (self._datetime_provider.now() - timedelta(days=7)).strftime("%Y-%m-%d")
         
+        print(f"\nRequesting matches for {competition} from {date_from} to {date_to}")
+
         # Apply rate limiting
         self._rate_limit()
         
@@ -135,7 +137,6 @@ class FootballAPIClient:
         response = self._make_request(url, params)
         status_code = response.status_code
         
-        print(f"\nFetching matches from {competition}")
         print(f"API Response: status code {status_code}, {responses.get(status_code, 'Unknown')}")
         
         if status_code != 200:

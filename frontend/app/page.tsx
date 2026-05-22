@@ -145,7 +145,7 @@ export default function Home() {
     }
   };
 
-  console.log("Match IDs in list:", matches.map(m => m.external_id));
+  console.log("Match IDs in list:", matches?.map(m => m.external_id));
   return (
       <main className="max-w-4xl mx-auto p-8 bg-slate-50 min-h-screen">
 
