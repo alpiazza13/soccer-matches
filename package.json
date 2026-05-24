@@ -4,5 +4,6 @@
   "private": true,
   "amplify:monorepo": {
     "appRoot": "frontend"
-  }
+  },
+  "dependencies": { "next": "16.1.1" }
 }
