@@ -130,74 +130,43 @@ def test_upsert_match_statement_structure(mock_db, sample_match):
     assert "utc_date =" in compiled_stmt
     assert "score =" in compiled_stmt
 
-
-def test_sync_data_success(monkeypatch, sample_match):
+@pytest.mark.parametrize("event, expected_source", [
+    (None, "local_script"),
+    ({"source": "aws.events"}, "scheduled"),
+    ({"source": "manual"}, "manual"),
+    ({"source": "custom_ui_button"}, "custom_ui_button"),
+    ({}, "manual"), 
+])
+def test_sync_data_event_routing(monkeypatch, event, expected_source):
     mock_db = MagicMock()
-    mock_db.commit = MagicMock()
-    mock_db.close = MagicMock()
-
-    monkeypatch.setenv("ENV", "production")
     monkeypatch.setattr(sync_db, "SessionLocal", lambda: mock_db)
-
-    client = MagicMock()
-    client.fetch_all_matches.return_value = ([sample_match], 1)
-    monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
     
-    # Mock sync service functions
-    from app.services import sync_service
-    monkeypatch.setattr(sync_service, "get_sync_freshness", lambda db, key: False)
-    monkeypatch.setattr(sync_service, "update_sync_metadata", MagicMock())
-
-    upsert_comp = MagicMock()
-    upsert_team = MagicMock()
-    upsert_match = MagicMock()
-    monkeypatch.setattr(sync_db, "upsert_competition", upsert_comp)
-    monkeypatch.setattr(sync_db, "upsert_team", upsert_team)
-    monkeypatch.setattr(sync_db, "upsert_match", upsert_match)
-
-    sync_db.sync_data()
-
-    upsert_comp.assert_called_once_with(mock_db, sample_match.competition)
-    assert upsert_team.call_count == 2
-    upsert_match.assert_called_once_with(mock_db, sample_match)
-    mock_db.commit.assert_called_once()
+    mock_perform_sync = MagicMock()
+    monkeypatch.setattr(sync_db, "perform_sync", mock_perform_sync)
+    
+    # Execute the wrapper
+    sync_db.sync_data(event=event, context=None)
+    
+    # Verify the correct source was passed down
+    mock_perform_sync.assert_called_once_with(mock_db, source=expected_source)
+    
+    # Verify the DB connection was closed
     mock_db.close.assert_called_once()
 
-
-def test_sync_data_continues_on_upsert_error(monkeypatch, sample_match):
+def test_sync_data_handles_exception(monkeypatch):
     mock_db = MagicMock()
-    mock_db.commit = MagicMock()
-    mock_db.close = MagicMock()
-
-    monkeypatch.setenv("ENV", "production")
     monkeypatch.setattr(sync_db, "SessionLocal", lambda: mock_db)
-
-    client = MagicMock()
-    m1 = sample_match
-    m2 = sample_match.model_copy(deep=True)
-    m2.match_id = 999999
-    client.fetch_all_matches.return_value = ([m1, m2], 2)
-    monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
     
-    # Mock sync service functions
-    from app.services import sync_service
-    monkeypatch.setattr(sync_service, "get_sync_freshness", lambda db, key: False)
-    monkeypatch.setattr(sync_service, "update_sync_metadata", MagicMock())
-
-    upsert_comp = MagicMock(side_effect=[Exception("boom"), None])
-    upsert_team = MagicMock()
-    upsert_match = MagicMock()
-    monkeypatch.setattr(sync_db, "upsert_competition", upsert_comp)
-    monkeypatch.setattr(sync_db, "upsert_team", upsert_team)
-    monkeypatch.setattr(sync_db, "upsert_match", upsert_match)
-
-    # Should not raise despite first upsert raising
-    sync_db.sync_data()
-
-    assert mock_db.commit.called
-    assert mock_db.close.called
-    assert upsert_comp.call_count == 2
-    upsert_match.assert_called_with(mock_db, m2)
+    # Force perform_sync to crash
+    mock_perform_sync = MagicMock(side_effect=Exception("Unexpected crash"))
+    monkeypatch.setattr(sync_db, "perform_sync", mock_perform_sync)
+    
+    # Execute (should not raise an exception because of the try/except block)
+    sync_db.sync_data(event=None)
+    
+    # Verify it rolled back and closed gracefully
+    mock_db.rollback.assert_called_once()
+    mock_db.close.assert_called_once()
 
 def test_perform_sync_logic(monkeypatch, mock_db, sample_match):
     # Mock the API client and date logic

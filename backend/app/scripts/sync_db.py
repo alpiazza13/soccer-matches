@@ -90,10 +90,11 @@ def perform_sync(db: Session, source: str = "scheduled"):
     
     # Check freshness (Prevents redundant API calls)
     if get_sync_freshness(db, "matches_sync"):
-        print("Data is already fresh. Aborting.")
+        print("Data is already fresh. Aborting. Triggered by: ", source)
         return
         
     try:
+        print(f"Starting perform sync... Triggered by: {source}")
         # Lock the database
         update_sync_metadata(db, "matches_sync", status="IN_PROGRESS")
         
@@ -122,18 +123,27 @@ def perform_sync(db: Session, source: str = "scheduled"):
         update_sync_metadata(db, "matches_sync", status="FAILED", error=str(e))
         print(f"Sync failed: {e}")
 
-def sync_data():
+def sync_data(event=None, context=None):
     """Wrapper for the CLI script"""
-    print("Starting sync DB...")
+
+    # Default to local script if event is totally missing
+    trigger_source = "local_script" 
+    if event is not None:
+        if event.get("source") == "aws.events":
+            trigger_source = "scheduled"
+        else:
+            trigger_source = event.get("source", "manual")
+    print(f"Starting sync DB... Triggered by: {trigger_source}")
+
     db = SessionLocal()
     try:
-        perform_sync(db)
+        perform_sync(db, source=trigger_source)
     except Exception as e:
         print(f"Script sync failed: {e}")
         db.rollback()
     finally:
         db.close()
-    print("Finished syncing db.")
+    print(f"Finished syncing db from {trigger_source}.")
 
 if __name__ == "__main__":
     if "sqlite" in os.getenv("DATABASE_URL", ""):
