@@ -5,11 +5,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy import literal
 from sqlalchemy.exc import IntegrityError
 
+from mangum import Mangum
+
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
 
 from app.services.sync_service import get_sync_freshness, update_sync_metadata, get_last_sync_time
 from app.database import get_db
@@ -23,6 +26,7 @@ from app.schemas import (
     UserSettingsUpdate,
 )
 from app.utils.security import hash_password, verify_password, create_access_token, get_current_user
+
 
 
 
@@ -40,7 +44,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "https://main.d1633hzrz3tbzl.amplifyapp.com/"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -267,3 +271,6 @@ async def validation_exception_handler(request, exc):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
+
+# Standardize the Mangum handler wrapper for AWS Lambda execution
+handler = Mangum(app)
