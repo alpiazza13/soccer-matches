@@ -49,4 +49,73 @@
 1. Update `models.py`
 2. From root of project, run `alembic revision --autogenerate -m "your_message"`
 3. Run `alembic upgrade head`
-4. 
+
+## Resetting Alembic History and Rebuilding Database
+### Step 1: Clear out the old version files
+
+Delete everything inside your local `alembic/versions/` directory so Alembic completely forgets your broken migration history:
+
+Bash
+
+```
+rm alembic/versions/*.py
+```
+
+### Step 2: Clear out the Supabase Database
+
+Run the schema reset script in your **Supabase SQL Editor** to ensure there are zero tables, ghost indexes, or old tracking data left:
+
+SQL
+
+```
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO anon;
+GRANT ALL ON SCHEMA public TO authenticated;
+```
+
+### Step 3: Generate the New Baseline Migration
+
+Because your Supabase database is now completely empty, running the autogenerate command while pointing to it will force Alembic to look at your current Python models and write a single, clean file to build everything from scratch.
+
+Run this in your Mac terminal **and ensure .env is pointed to Supabase DB**:
+
+Bash
+
+```
+alembic revision --autogenerate -m "initial_schema_baseline"
+```
+
+Open this newly generated file inside `alembic/versions/`. You will see it contains a single `upgrade()` function that sequentially builds all your tables (`competitions`, `teams`, `matches`, `users`, `user_matches`) and sets up their constraints correctly in one shot.
+
+### Step 4: Run the Migration
+
+Execute the upgrade command to apply your clean baseline schema to Supabase:
+
+Bash
+
+```
+alembic upgrade head
+```
+
+
+### Step 5. Wipe the local SQLite file
+
+Since you are nuking the migration history files anyway, delete your local SQLite database file so it doesn't contain old tracking metadata:
+
+Bash
+
+```
+rm test_db.sqlite
+```
+
+### Step 6. Sync your Local SQLite
+
+Now, switch your `.env` file's `DATABASE_URL` back to your local SQLite path (`sqlite:///./test_db.sqlite`). Then, run the exact same upgrade command:
+
+Bash
+
+```
+alembic upgrade head
+```
