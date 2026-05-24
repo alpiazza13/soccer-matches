@@ -157,13 +157,13 @@ class TestValidationErrorHandler:
 class TestSyncEndpoint:
     """Test suite for the manual database sync endpoint."""
 
-    def test_trigger_sync_success(self, client_with_db, monkeypatch, session_test_user):
-        """Verify the endpoint returns success when the sync function completes."""
+    def test_trigger_sync_direct_execution(self, client_with_db, monkeypatch, session_test_user):
+        """Verify the endpoint executes sync directly when ENV is not 'production'."""
         mock_perform = MagicMock()
         monkeypatch.setattr("app.main.get_sync_freshness", lambda db, key: False)
         monkeypatch.setattr("app.main.perform_sync", mock_perform)
         monkeypatch.setattr("app.main.update_sync_metadata", MagicMock())
-        monkeypatch.setattr("app.main.is_syncing_globally", False)
+        monkeypatch.setattr("app.main.USE_LAMBDA_FOR_SYNC", False)
         
         response = client_with_db.post("/api/matches/sync", headers=session_test_user["headers"])
         
@@ -173,6 +173,22 @@ class TestSyncEndpoint:
             "message": "Database synced successfully"
         }
         mock_perform.assert_called_once()
+
+    def test_trigger_sync_lambda_invocation(self, client_with_db, monkeypatch, session_test_user):
+        """Verify the endpoint invokes Lambda when ENV is 'production'."""
+        mock_lambda = MagicMock()
+        mock_invoke = MagicMock()
+        mock_lambda.invoke = mock_invoke
+        
+        monkeypatch.setattr("app.main.get_sync_freshness", lambda db, key: False)
+        monkeypatch.setattr("app.main.USE_LAMBDA_FOR_SYNC", True)
+        monkeypatch.setattr("boto3.client", lambda service: mock_lambda)
+        
+        response = client_with_db.post("/api/matches/sync", headers=session_test_user["headers"])
+        
+        assert response.status_code == 200
+        assert "background" in response.json()["message"]
+        mock_invoke.assert_called_once()
 
     def test_trigger_sync_skipped_when_fresh(self, client_with_db, monkeypatch, session_test_user):
         """Verify sync is skipped if the service says data is already fresh."""
@@ -186,16 +202,34 @@ class TestSyncEndpoint:
         assert "already fresh" in response.json()["message"]
         mock_perform.assert_not_called()
 
-    def test_trigger_sync_failure_releases_lock(self, client_with_db, monkeypatch, session_test_user):
-        """Verify lock is released and metadata updated on failure."""
+    def test_trigger_sync_lambda_failure_propagates(self, client_with_db, monkeypatch, session_test_user):
+        """Verify that Lambda invocation failure is propagated (no fallback)."""
+        mock_lambda = MagicMock()
+        mock_invoke = MagicMock(side_effect=Exception("Lambda Service Error"))
+        mock_lambda.invoke = mock_invoke
+        
+        mock_update = MagicMock()
+        
+        monkeypatch.setattr("app.main.get_sync_freshness", lambda db, key: False)
+        monkeypatch.setattr("app.main.USE_LAMBDA_FOR_SYNC", True)
+        monkeypatch.setattr("boto3.client", lambda service: mock_lambda)
+        monkeypatch.setattr("app.main.update_sync_metadata", mock_update)
+        
+        response = client_with_db.post("/api/matches/sync", headers=session_test_user["headers"])
+        
+        assert response.status_code == 500
+        # Verify metadata was updated with FAILED status
+        mock_update.assert_called_with(ANY, "matches_sync", status="FAILED", error="Lambda Service Error")
+
+    def test_trigger_sync_failure_updates_metadata(self, client_with_db, monkeypatch, session_test_user):
+        """Verify metadata is updated on failure."""
         mock_perform = MagicMock(side_effect=Exception("API Down"))
         mock_update = MagicMock()
         
         monkeypatch.setattr("app.main.get_sync_freshness", lambda db, key: False)
         monkeypatch.setattr("app.main.perform_sync", mock_perform)
         monkeypatch.setattr("app.main.update_sync_metadata", mock_update)
-        
-        monkeypatch.setattr("app.main.is_syncing_globally", False)
+        monkeypatch.setattr("app.main.USE_LAMBDA_FOR_SYNC", False)
 
         # Mock DB methods to prevent transaction deassociation warnings
         monkeypatch.setattr("sqlalchemy.orm.Session.rollback", lambda x: None)
@@ -206,18 +240,6 @@ class TestSyncEndpoint:
         
         # Verify metadata was updated with FAILED status
         mock_update.assert_called_with(ANY, "matches_sync", status="FAILED", error="API Down")
-
-        # Verify lock was released by trying a second successful request
-        mock_perform.side_effect = None
-        response_two = client_with_db.post("/api/matches/sync", headers=session_test_user["headers"])
-        assert response_two.status_code == 200
-
-    def test_trigger_sync_already_in_progress(self, client_with_db, monkeypatch, session_test_user):
-        """Verify 429 is returned if the global lock is already active."""
-        monkeypatch.setattr("app.main.is_syncing_globally", True)
-        response = client_with_db.post("/api/matches/sync", headers=session_test_user["headers"])
-        assert response.status_code == 429
-        assert "already in progress" in response.json()["detail"]
 
     def test_get_sync_status_empty(self, client_with_db, user_payload, auth_headers):
         """Verify status endpoint when no sync has ever run."""

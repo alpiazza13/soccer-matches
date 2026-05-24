@@ -84,23 +84,43 @@ def upsert_match(db: Session, m: MatchSchema):
     db.execute(stmt)
 
 
-def perform_sync(db: Session):
-    """Core logic to be called by both script and API"""
-    client = FootballAPIClient()
-    start_date = get_sync_start_date(db)
-    print("Got start date = ", start_date)
-    processed_matches, _ = client.fetch_all_matches(date_from=start_date)
+def perform_sync(db: Session, source: str = "scheduled"):
+    """Core logic to be called by both scheduled trigger and API"""
+    from app.services.sync_service import get_sync_freshness, update_sync_metadata
     
-    for m in processed_matches:
-        try:
-            upsert_competition(db, m.competition)
-            upsert_team(db, m.home_team)
-            upsert_team(db, m.away_team)
-            upsert_match(db, m)
-        except Exception as e:
-            print(f"Sync Error for match {m.match_id}: {e}")
-            continue
-    db.commit()
+    # Check freshness (Prevents redundant API calls)
+    if get_sync_freshness(db, "matches_sync"):
+        print("Data is already fresh. Aborting.")
+        return
+        
+    try:
+        # Lock the database
+        update_sync_metadata(db, "matches_sync", status="IN_PROGRESS")
+        
+        client = FootballAPIClient()
+        start_date = get_sync_start_date(db)
+        print("Got start date = ", start_date)
+        processed_matches, _ = client.fetch_all_matches(date_from=start_date)
+        
+        for m in processed_matches:
+            try:
+                upsert_competition(db, m.competition)
+                upsert_team(db, m.home_team)
+                upsert_team(db, m.away_team)
+                upsert_match(db, m)
+            except Exception as e:
+                print(f"Sync Error for match {m.match_id}: {e}")
+                continue
+                
+        db.commit()
+        # Release lock with success
+        update_sync_metadata(db, "matches_sync", status="SUCCESS")
+        
+    except Exception as e:
+        db.rollback()
+        # Release lock with failure
+        update_sync_metadata(db, "matches_sync", status="FAILED", error=str(e))
+        print(f"Sync failed: {e}")
 
 def sync_data():
     """Wrapper for the CLI script"""

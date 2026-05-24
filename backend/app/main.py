@@ -1,5 +1,7 @@
 from typing import List, cast
 from contextlib import asynccontextmanager
+import json
+import boto3
 
 from sqlalchemy.orm import Session
 from sqlalchemy import literal
@@ -27,6 +29,7 @@ from app.schemas import (
     UserSettingsUpdate,
 )
 from app.utils.security import hash_password, verify_password, create_access_token, get_current_user
+from app.config import USE_LAMBDA_FOR_SYNC, LAMBDA_FUNCTION_NAME
 
 
 
@@ -159,33 +162,36 @@ def login_for_access_token(
     access_token = create_access_token(subject=user.email)
     return {"access_token": access_token, "token_type": "bearer"}
 
-is_syncing_globally = False
-
 @app.post("/api/matches/sync")
 def trigger_sync(db: Session = Depends(get_db)):
     """
     Manually triggers a sync with the Football API to update local matches.
+    Uses Lambda for async processing if configured, otherwise executes directly.
     """
-    global is_syncing_globally
-    if is_syncing_globally:
-        raise HTTPException(status_code=429, detail="Sync already in progress. Please wait.")
-    
     try:
-        is_syncing_globally = True
+        # Check freshness first to avoid unnecessary work
         if get_sync_freshness(db, "matches_sync"):
             return {"success": True, "message": "Data is already fresh."}
-        perform_sync(db)
-        update_sync_metadata(db, "matches_sync", status="SUCCESS")
-        return {"success": True, "message": "Database synced successfully"}
+        
+        if USE_LAMBDA_FOR_SYNC:
+            # Offload to Lambda for async execution
+            lambda_client = boto3.client('lambda')
+            lambda_client.invoke(
+                FunctionName=LAMBDA_FUNCTION_NAME,
+                InvocationType='Event',
+                Payload=json.dumps({"source": "manual_api_trigger"})
+            )
+            return {"success": True, "message": "Sync started in the background."}
+        else:
+            # Direct execution (local development or testing)
+            perform_sync(db, source="manual_api_trigger")
+            return {"success": True, "message": "Database synced successfully"}
     
     except Exception as e:
         db.rollback()
         update_sync_metadata(db, "matches_sync", status="FAILED", error=str(e))
         print(f"Manual sync failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to sync with Football API. Check server logs.")
-    
-    finally:
-        is_syncing_globally = False
 
 @app.get("/api/matches/sync/status")
 def get_sync_status(db: Session = Depends(get_db)):

@@ -142,6 +142,11 @@ def test_sync_data_success(monkeypatch, sample_match):
     client = MagicMock()
     client.fetch_all_matches.return_value = ([sample_match], 1)
     monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
+    
+    # Mock sync service functions
+    from app.services import sync_service
+    monkeypatch.setattr(sync_service, "get_sync_freshness", lambda db, key: False)
+    monkeypatch.setattr(sync_service, "update_sync_metadata", MagicMock())
 
     upsert_comp = MagicMock()
     upsert_team = MagicMock()
@@ -173,6 +178,11 @@ def test_sync_data_continues_on_upsert_error(monkeypatch, sample_match):
     m2.match_id = 999999
     client.fetch_all_matches.return_value = ([m1, m2], 2)
     monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
+    
+    # Mock sync service functions
+    from app.services import sync_service
+    monkeypatch.setattr(sync_service, "get_sync_freshness", lambda db, key: False)
+    monkeypatch.setattr(sync_service, "update_sync_metadata", MagicMock())
 
     upsert_comp = MagicMock(side_effect=[Exception("boom"), None])
     upsert_team = MagicMock()
@@ -195,6 +205,11 @@ def test_perform_sync_logic(monkeypatch, mock_db, sample_match):
     client.fetch_all_matches.return_value = ([sample_match], 1)
     monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
     monkeypatch.setattr(sync_db, "get_sync_start_date", lambda db: "2026-01-01")
+    
+    # Mock sync service functions
+    from app.services import sync_service
+    monkeypatch.setattr(sync_service, "get_sync_freshness", lambda db, key: False)
+    monkeypatch.setattr(sync_service, "update_sync_metadata", MagicMock())
 
     # Mock upsert functions
     upsert_comp = MagicMock()
@@ -217,7 +232,82 @@ def test_perform_sync_does_not_close_db(monkeypatch, mock_db):
     client.fetch_all_matches.return_value = ([], 0)
     monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
     
+    # Mock sync service functions
+    from app.services import sync_service
+    monkeypatch.setattr(sync_service, "get_sync_freshness", lambda db, key: False)
+    monkeypatch.setattr(sync_service, "update_sync_metadata", MagicMock())
+    
     sync_db.perform_sync(mock_db)
     
     # Ensure close was never called inside the unit
     assert mock_db.close.call_count == 0
+
+def test_perform_sync_skips_when_fresh(monkeypatch, mock_db):
+    """Verify perform_sync returns early if data is already fresh."""
+    from app.services import sync_service
+    
+    mock_client = MagicMock()
+    monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: mock_client)
+    
+    # Mock get_sync_freshness to return True (data is fresh)
+    monkeypatch.setattr(sync_service, "get_sync_freshness", lambda db, key: True)
+    mock_update = MagicMock()
+    monkeypatch.setattr(sync_service, "update_sync_metadata", mock_update)
+    
+    # Execute
+    sync_db.perform_sync(mock_db)
+    
+    # Verify API client was never called (early return)
+    mock_client.fetch_all_matches.assert_not_called()
+    # Verify no commit happened
+    mock_db.commit.assert_not_called()
+
+def test_perform_sync_updates_status_on_success(monkeypatch, mock_db, sample_match):
+    """Verify perform_sync updates metadata status to SUCCESS on completion."""
+    from app.services import sync_service
+    
+    client = MagicMock()
+    client.fetch_all_matches.return_value = ([sample_match], 1)
+    monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
+    monkeypatch.setattr(sync_db, "get_sync_start_date", lambda db: "2026-01-01")
+    
+    mock_update = MagicMock()
+    monkeypatch.setattr(sync_service, "get_sync_freshness", lambda db, key: False)
+    monkeypatch.setattr(sync_service, "update_sync_metadata", mock_update)
+    
+    # Mock upsert functions
+    monkeypatch.setattr(sync_db, "upsert_competition", MagicMock())
+    monkeypatch.setattr(sync_db, "upsert_team", MagicMock())
+    monkeypatch.setattr(sync_db, "upsert_match", MagicMock())
+    
+    # Execute
+    sync_db.perform_sync(mock_db)
+    
+    # Verify update_sync_metadata was called with IN_PROGRESS at start
+    assert mock_update.call_count >= 2  # At least IN_PROGRESS and SUCCESS
+    # Check the final call is SUCCESS
+    final_call_args = mock_update.call_args_list[-1]
+    assert "SUCCESS" in final_call_args[0] or final_call_args[1].get("status") == "SUCCESS"
+
+def test_perform_sync_updates_status_on_failure(monkeypatch, mock_db):
+    """Verify perform_sync updates metadata status to FAILED on error."""
+    from app.services import sync_service
+    
+    client = MagicMock()
+    client.fetch_all_matches.side_effect = Exception("API Error")
+    monkeypatch.setattr(sync_db, "FootballAPIClient", lambda: client)
+    monkeypatch.setattr(sync_db, "get_sync_start_date", lambda db: "2026-01-01")
+    
+    mock_update = MagicMock()
+    monkeypatch.setattr(sync_service, "get_sync_freshness", lambda db, key: False)
+    monkeypatch.setattr(sync_service, "update_sync_metadata", mock_update)
+    
+    # Execute (should not raise, just handle gracefully)
+    sync_db.perform_sync(mock_db)
+    
+    # Verify rollback was called
+    mock_db.rollback.assert_called_once()
+    
+    # Verify update_sync_metadata was called with FAILED status
+    final_call_args = mock_update.call_args_list[-1]
+    assert "FAILED" in final_call_args[0] or final_call_args[1].get("status") == "FAILED"
