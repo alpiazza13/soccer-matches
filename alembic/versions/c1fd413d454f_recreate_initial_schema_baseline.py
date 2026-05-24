@@ -1,8 +1,8 @@
-"""add userMatch to match relationship
+"""recreate_initial_schema_baseline
 
-Revision ID: 76e66b1b63c7
-Revises: 2989dc9723ad
-Create Date: 2026-01-02 15:37:52.852932
+Revision ID: c1fd413d454f
+Revises: 
+Create Date: 2026-05-23 19:39:31.085653
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '76e66b1b63c7'
-down_revision: Union[str, Sequence[str], None] = '2989dc9723ad'
+revision: str = 'c1fd413d454f'
+down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -29,6 +29,15 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('external_id')
     )
+    op.create_table('sync_metadata',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('sync_key', sa.String(), nullable=False),
+    sa.Column('last_run_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('status', sa.String(), nullable=True),
+    sa.Column('last_error', sa.Text(), nullable=True),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('sync_key')
+    )
     op.create_table('teams',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('external_id', sa.Integer(), nullable=True),
@@ -43,7 +52,9 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('email', sa.String(), nullable=False),
     sa.Column('hashed_password', sa.String(), nullable=False),
-    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('is_verified', sa.Boolean(), nullable=False),
+    sa.Column('hide_scores', sa.Boolean(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
@@ -69,7 +80,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('match_id', sa.Integer(), nullable=False),
-    sa.Column('is_done', sa.Boolean(), nullable=True),
+    sa.Column('is_done', sa.Boolean(), nullable=False),
     sa.Column('notes', sa.String(), nullable=True),
     sa.Column('last_updated', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['match_id'], ['matches.id'], ),
@@ -94,5 +105,6 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_teams_id'), table_name='teams')
     op.drop_index(op.f('ix_teams_external_id'), table_name='teams')
     op.drop_table('teams')
+    op.drop_table('sync_metadata')
     op.drop_table('competitions')
     # ### end Alembic commands ###
