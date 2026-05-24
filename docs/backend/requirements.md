@@ -1,0 +1,3 @@
+- use `pip install` to install things in local virtual envrionment
+- anything which is installed in the venv needs to be added to requirements.txt and the docker container will install everything in there
+- 

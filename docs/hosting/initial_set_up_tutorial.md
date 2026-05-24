@@ -132,7 +132,7 @@ Now, look at the list of repositories on your screen. Click directly on the name
 
 In the top right corner of that specific repository page, click the button that says **View push commands**. AWS will pop up a window showing you 4 exact terminal commands customized with your specific AWS Account ID number.
 
-Go to your local terminal, make sure you are in your project root folder (`soccer-matches`) where your `Dockerfile` sits, and execute the 1st command from the browser but the other three as specified below because the below verions are specified to work properly. You must already have Docker installed for this - Docker Desktop for Mac.
+Go to your local terminal, make sure you are in your project **backend** root folder (`soccer-matches`) where your `Dockerfile` sits, and execute the 1st command from the browser but the other three as specified below because the below verions are specified to work properly. You must already have Docker installed for this - Docker Desktop for Mac.
 
 1. **Authenticate your local Docker app with your cloud AWS registry:**
     
@@ -209,10 +209,12 @@ We will utilize the _same_ pushed ECR image to instantiate **two separate Lambda
 3. Select the exact same ECR image tag and other settings (ARM64 toggled on) as before.
     
 4. Under **Configuration** -> **General configuration**, edit the **Timeout** to **5 minutes** (the ingestion routine performs multiple sequential API requests and needs extra execution time).
+
+5. Add the same ENV variables as you added for the `soccer-match-tracker-api` lambda.
     
-5. Under to the **Code** -> **Image configuration**, click **Edit**.
+6. Under **Code** -> **Image configuration**, click **Edit**.
     
-6. Override the **CMD** parameter to invoke your script entry point directly instead of the main API handler:
+7. Override the **CMD** parameter to invoke your script entry point directly instead of the main API handler:
     
     - **CMD Override:** `app.scripts.sync_db.sync_data`
         
@@ -257,66 +259,99 @@ To protect your Supabase database from connection crashes and insulate your AWS 
 
 ### Phase 6: Frontend Mapping & CORS Alignment
 
-### Step 6.1: Set Up AWS Amplify (Monorepo Configuration)
+This phase establishes the monorepo connection between your repository and AWS Amplify, forces the correct Server-Side Rendering (SSR) configuration, and aligns your backend security to accept traffic from your live production URL.
 
-1. Navigate to **AWS Amplify** in the AWS Console and select **Deploy an app** (or **Create new app** -> **Host web app**).
+#### Step 6.1: Prepare the Monorepo Manifest
+
+To ensure AWS Amplify correctly identifies your project as a **Next.js SSR** application rather than a static web site, you must create a root-level manifest.
+
+1. Create a file named `package.json` at the absolute root of your project directory.
     
-2. Select **GitHub** as your source provider, authorize your account, and choose your repository and the `main` branch.
+2. Paste the following content, which includes the `amplify:monorepo` instruction and the `next` dependency "bait" to trigger the correct SSR server provisioning:
     
-3. On the **Build settings** page, Amplify will detect your repository structure. Edit the yml file to contain the below:
-```
+    JSON
+    
+    ```
+    {
+      "name": "soccer-matches-monorepo",
+      "version": "1.0.0",
+      "private": true,
+      "amplify:monorepo": {
+        "appRoot": "frontend"
+      },
+      "dependencies": {
+        "next": "16.1.1"
+      }
+    }
+    ```
+    
+3. Commit and push this file to your main branch.
+    
+
+#### Step 6.2: Deploy to AWS Amplify
+
+1. Navigate to **AWS Amplify** in the AWS Console and select **Create new app** > **Host web app**.
+    
+2. Authorize **GitHub**, select your repository, and choose your main branch.
+    
+3. On the **Build settings** page, ensure the YAML configuration is set to target the `frontend` subfolder:
+    
     YAML
     
-version: 1
-frontend:
-    phases:
-        preBuild:
-            commands:
-                - 'cd frontend && npm ci'
-        build:
-            commands:
-                - ""
-    artifacts:
-        baseDirectory: frontend/.next
-        files:
-            - '**/*'
-    cache:
-        paths:
-            - 'frontend/node_modules/**/*'
-```
+    ```
+    version: 1
+    applications:
+      - appRoot: frontend
+        frontend:
+          phases:
+            preBuild:
+              commands:
+                - npm ci
+            build:
+              commands:
+                - npm run build
+          artifacts:
+            baseDirectory: .next
+            files:
+              - '**/*'
+          cache:
+            paths:
+              - node_modules/**/*
+    ```
     
-4. Expand the **Advanced settings** or **Environment variables** section and add your backend target:
+4. In the **Environment variables** section, add your backend endpoint:
     
     - **Key:** `NEXT_PUBLIC_API_URL`
         
-    - **Value:** `https://[YOUR-API-GATEWAY-ID].execute-api.us-east-2.amazonaws.com` _(Replace with your actual Invoke URL from Step 5.1)_
+    - **Value:** `https://[YOUR-API-GATEWAY-ID].execute-api.us-east-2.amazonaws.com`
         
-5. Click **Save and deploy**. Amplify will provision your environment and instantly generate your public production domain link (e.g., `https://main.d123456abcdef.amplifyapp.com`) on the app dashboard. Copy this URL.
+5. Click **Save and deploy**. Once complete, verify in **App settings > General** that the **Framework** is listed as **Next.js - SSR**. If it says "Web," disconnect the branch and reconnect it to force a re-scan.
     
 
-### Step 6.2: Update FastAPI CORS Rules
+#### Step 6.3: Align FastAPI CORS Rules
 
-1. Open your backend `app/main.py` file on your local machine.
-    
-2. Modify the `origins` array inside your `CORSMiddleware` block to include your brand-new production Amplify URL alongside your local testing URL:
+Once the deployment finishes and provides your public URL (e.g., `https://main.d123456abcdef.amplifyapp.com`), you must update your backend to allow traffic from that domain.
+
+1. In your local backend `app/main.py`, update the `origins` list:
     
     Python
     
     ```
     origins = [
         "http://localhost:3000",
-        "https://main.d123456abcdef.amplifyapp.com",  # Replace with your actual Amplify URL
+        "https://main.d123456abcdef.amplifyapp.com", # Your new production URL
     ]
-    
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
     ```
     
-3. Save the file, commit your changes, and run your Docker build, tag, and push sequence one final time to update your container image in Amazon ECR (`us-east-2`).
+2. Save, commit, and push your changes.
     
-4. Force a new deployment of your `soccer-match-tracker-api` Lambda function so it pulls the updated image with the correct security rules.
+3. Perform your standard Docker build, tag, and push sequence to update your container in **Amazon ECR**.
+    
+4. Force a new deployment of your **Lambda function** so it pulls the updated image containing the new CORS policy.
+    
+5. Return to the Amplify console and click **Redeploy** on your app dashboard to sync the final environment state.
+
+
+
+
+
