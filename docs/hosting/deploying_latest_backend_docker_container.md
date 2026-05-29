@@ -23,7 +23,7 @@
     ```
     docker push 558147955096.dkr.ecr.us-east-2.amazonaws.com/soccer-match-tracker-backend:latest
     ```
-If 403 forbidden error occurs, run below to reauthenticate:
+If 403 forbidden error occurs, run below to reauthenticate, and then run push command again:
 
 	Bash
 	
