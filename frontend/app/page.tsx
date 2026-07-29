@@ -16,15 +16,17 @@ export default function Home() {
   const { token, logout, hideScores, setHideScores } = useUser();
   const [matches, setMatches] = useState<Match[]>([]);
   const [offset, setOffset] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isMatchesLoading, setIsMatchesLoading] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [hideDone, setHideDone] = useState(false);
   const LIMIT = 20;
 
   const fetchMatches = useCallback(async (currentOffset: number) => {
     if (!token) return;
+    setIsMatchesLoading(true);
     if (currentOffset > 0) {
-      setLoading(true);
+      setIsLoadingMore(true);
     }
     try {
       const res = await fetch(
@@ -50,7 +52,8 @@ export default function Home() {
       console.error("Failed to fetch matches:", error);
       setMatches([]);
     } finally {
-      setLoading(false);
+      setIsLoadingMore(false);
+      setIsMatchesLoading(false);
     }
   }, [token, hideDone]);
 
@@ -212,23 +215,32 @@ export default function Home() {
         </div>
         
         <div className="grid gap-3 mb-8">
-          {visibleMatches.map((match) => (
-            <MatchCard 
-              key={match.external_id} 
-              match={match} 
-              onToggle={toggleMatchLocal}
-            />
-          ))}
+          {isMatchesLoading && visibleMatches.length === 0 ? (
+            <div className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white p-10 text-slate-500">
+              <div className="flex items-center gap-3">
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+                <span className="text-sm font-medium">Loading matches...</span>
+              </div>
+            </div>
+          ) : (
+            visibleMatches.map((match) => (
+              <MatchCard 
+                key={match.external_id} 
+                match={match} 
+                onToggle={toggleMatchLocal}
+              />
+            ))
+          )}
         </div>
 
       {visibleMatches.length > 0 && (
         <div className="flex justify-center pb-12">
           <button
             onClick={handleLoadMore}
-            disabled={loading}
+            disabled={isLoadingMore}
             className="px-8 py-3 bg-blue-600 text-white rounded-full font-semibold shadow-lg hover:bg-blue-700 disabled:bg-slate-300 transition-all"
           >
-            {loading ? 'Loading...' : 'Load More'}
+            {isLoadingMore ? 'Loading...' : 'Load More'}
           </button>
         </div>
       )}
