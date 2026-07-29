@@ -10,6 +10,7 @@ export default function UserLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const formatError = (data: any) => {
       return typeof data.detail === 'string' 
@@ -25,7 +26,9 @@ export default function UserLogin() {
       setError("Please enter both an email and a password to login.");
       return;
     }
-    
+
+    setIsSubmitting(true);
+
     // OAuth2PasswordRequestForm expects x-www-form-urlencoded data
     const formData = new URLSearchParams();
     formData.append('username', email); // backend uses 'username' for the email
@@ -37,7 +40,7 @@ export default function UserLogin() {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData,
       });
-      
+
       const data = await res.json();
       if (res.ok) {
         setToken(data.access_token); // Save the JWT token
@@ -46,6 +49,8 @@ export default function UserLogin() {
       }
     } catch (err) {
       setError("Server connection failed.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -58,7 +63,8 @@ const handleCreate = async (e?: React.FormEvent) => {
     }
 
     setError(null);
-    setSuccess(null)
+    setSuccess(null);
+    setIsSubmitting(true);
     
     try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
@@ -76,6 +82,8 @@ const handleCreate = async (e?: React.FormEvent) => {
       }
     } catch (err) {
       setError("Server connection failed.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -144,15 +152,31 @@ return (
       <div className="flex gap-3">
         <button 
           onClick={handleLogin}
-          className="flex-1 bg-slate-800 text-white px-4 py-2 rounded-lg font-medium hover:bg-slate-700 transition-colors"
+          disabled={isSubmitting}
+          className="flex-1 bg-slate-800 text-white px-4 py-2 rounded-lg font-medium hover:bg-slate-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          Sign In
+          {isSubmitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Signing In...
+            </span>
+          ) : (
+            'Sign In'
+          )}
         </button>
         <button 
           onClick={handleCreate}
-          className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-500 transition-colors"
+          disabled={isSubmitting}
+          className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          Create Account
+          {isSubmitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Creating...
+            </span>
+          ) : (
+            'Create Account'
+          )}
         </button>
       </div>
     </div>
