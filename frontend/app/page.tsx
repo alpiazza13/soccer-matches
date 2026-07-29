@@ -27,23 +27,28 @@ export default function Home() {
       setLoading(true);
     }
     try {
-      // Fetching with limit and offset from your FastAPI parameters
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/matches?limit=${LIMIT}&offset=${currentOffset}&hide_done=${hideDone}`,
-        {headers: {'Authorization': `Bearer ${token}`}}
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.detail || `Request failed with status ${res.status}`);
+      }
+
       const newData = await res.json();
-      
+      const normalizedData = Array.isArray(newData) ? newData : [];
+
       setMatches(prev => {
-        if (currentOffset === 0) return newData;
-        // If we are appending, filter out matches that already exist in 'prev'
+        if (currentOffset === 0) return normalizedData;
         const existingIds = new Set(prev.map(m => m.external_id));
-        const uniqueNewData = newData.filter((m: Match) => !existingIds.has(m.external_id));
+        const uniqueNewData = normalizedData.filter((m: Match) => !existingIds.has(m.external_id));
         return [...prev, ...uniqueNewData];
       });
-      
     } catch (error) {
       console.error("Failed to fetch matches:", error);
+      setMatches([]);
     } finally {
       setLoading(false);
     }
@@ -145,7 +150,6 @@ export default function Home() {
     }
   };
 
-  console.log("Match IDs in list:", matches?.map(m => m.external_id));
   return (
       <main className="max-w-4xl mx-auto p-8 bg-slate-50 min-h-screen">
 
