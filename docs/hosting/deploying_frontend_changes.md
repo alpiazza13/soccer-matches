@@ -1,0 +1,1 @@
+Just push to main branch of git repo, and Amplify does the deployment automatically.
