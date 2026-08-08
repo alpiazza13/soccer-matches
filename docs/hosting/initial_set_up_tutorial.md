@@ -234,11 +234,11 @@ We will utilize the _same_ pushed ECR image to instantiate **two separate Lambda
 
 #### Step 5.2: Automate the Hourly Ingestion (EventBridge)
 
-1. Navigate to **Amazon EventBridge** -> **Rules** and click **Create rule**.
+1. Navigate to **Amazon EventBridge** -> **Schedules** and click **Create schedule**.
 2. Name it `hourly-soccer-data-sync`.
-3. Under **Rule type**, choose **Schedule**.
-4. Set the schedule pattern to a standard cron rate expression: `cron(0 * * * ? *)` (this tells AWS to fire the rule exactly at the top of every hour).
-5. Set the **Target** to **AWS Lambda function** and choose your `soccer-match-tracker-sync-worker`.
+3. Set the schedule pattern to a standard cron rate expression: `cron(0 * * * ? *)` (this tells AWS to fire the rule exactly at the top of every hour).
+4. Set the **Target** to **AWS Lambda function** and choose your `soccer-match-tracker-sync-worker`.
+5. For the **Role**, choose the existing sync worker role.
 6. Click **Create**.
 
 #### Step 5.3: Implement Front-Door Rate Limiting (Throttling)
