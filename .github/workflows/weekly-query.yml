@@ -3,7 +3,7 @@ name: Weekly Supabase Query
 on:
   schedule:
     # Runs every Sunday at midnight UTC
-    - cron: '0 0 * * 0'
+    - cron: '0 0 * * 0,4'
   # Allows manual runs from the GitHub Actions UI
   workflow_dispatch:
 
