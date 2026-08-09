@@ -238,7 +238,7 @@ We will utilize the _same_ pushed ECR image to instantiate **two separate Lambda
 2. Name it `hourly-soccer-data-sync`.
 3. Set the schedule pattern to a standard cron rate expression: `cron(0 * * * ? *)` (this tells AWS to fire the rule exactly at the top of every hour).
 4. Set the **Target** to **AWS Lambda function** and choose your `soccer-match-tracker-sync-worker`.
-5. For the **Role**, choose the existing sync worker role.
+5. For the **Role**, choose the existing sync worker role. If not done already, update the Trust relationships of this role in the IAM Console to include `scheduler.amazonaws.com`. 
 6. Click **Create**.
 
 #### Step 5.3: Implement Front-Door Rate Limiting (Throttling)
