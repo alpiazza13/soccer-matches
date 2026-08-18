@@ -240,6 +240,21 @@ We will utilize the _same_ pushed ECR image to instantiate **two separate Lambda
 4. Set the **Target** to **AWS Lambda function** and choose your `soccer-match-tracker-sync-worker`.
 5. For the **Role**, choose the existing sync worker role. If not done already, update the Trust relationships of this role in the IAM Console to include `scheduler.amazonaws.com`. 
 6. Click **Create**.
+7. We now need to make sure the execution role for this schedule has permission to invoke the sync worker lambda function:
+8. Under AmazonEventBridge --> Schedules --> `hourly-soccer-data-sync`,  go to Target and click the link to the Execution Role.
+9. Click Add Permissions and paste the following into the JSON. Name the permission `EventBridgeSchedulerLambdaInvoke`
+	 ```json
+	 {
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": "lambda:InvokeFunction",
+			"Resource": "arn:aws:lambda:us-east-2:558147955096:function:soccer-match-tracker-sync-worker"
+		}
+	]
+}
+	 ```
 
 #### Step 5.3: Implement Front-Door Rate Limiting (Throttling)
 
