@@ -159,9 +159,6 @@ export default function Home() {
         <div className="flex justify-between items-end mb-8 border-b border-slate-200 pb-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Matches</h1>
-            <p className="text-sm text-slate-500 font-medium">
-              Logged in
-            </p>
           </div>
           
           <div className="flex items-center gap-6">
