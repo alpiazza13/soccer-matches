@@ -9,6 +9,10 @@ export default function MatchCard({ match, onToggle }: { match: Match, onToggle:
     const [done, setDone] = useState(match.is_done);
     const [showScoreLocally, setShowScoreLocally] = useState(false);
 
+  const localDate = new Date(match.utc_date);
+  const dateString = localDate.toLocaleDateString();
+  const timeString = localDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+
   const toggleDone = async () => {
     if (!token) return;
     const newStatus = !done;
@@ -40,8 +44,8 @@ export default function MatchCard({ match, onToggle }: { match: Match, onToggle:
 
   return (
     <div className="flex items-center justify-between p-4 bg-white border rounded-xl shadow-sm">
-      <div className="w-24 text-sm font-bold text-slate-900">
-        {new Date(match.utc_date).toLocaleDateString()}
+      <div className="w-36 text-sm font-bold text-blue-700">
+        {dateString} {timeString}
       </div>
 
       <div className="flex-1 flex items-center justify-center gap-4">
