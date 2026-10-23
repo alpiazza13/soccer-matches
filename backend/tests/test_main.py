@@ -157,6 +157,17 @@ class TestValidationErrorHandler:
 class TestSyncEndpoint:
     """Test suite for the manual database sync endpoint."""
 
+    def test_trigger_sync_requires_authentication(self, client_with_db, monkeypatch):
+        """Reject unauthenticated requests without starting a sync."""
+        mock_perform = MagicMock()
+        monkeypatch.setattr("app.main.get_sync_freshness", lambda db, key: False)
+        monkeypatch.setattr("app.main.perform_sync", mock_perform)
+
+        response = client_with_db.post("/api/matches/sync")
+
+        assert response.status_code == 401
+        mock_perform.assert_not_called()
+
     def test_trigger_sync_direct_execution(self, client_with_db, monkeypatch, session_test_user):
         """Verify the endpoint executes sync directly when ENV is not 'production'."""
         mock_perform = MagicMock()

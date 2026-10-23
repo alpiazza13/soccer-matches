@@ -7,9 +7,10 @@ interface RefreshButtonProps {
   onSyncComplete: () => void;
   isFresh: boolean;           
   lastSynced: string | null;
+  token: string;
 }
 
-export default function RefreshButton({ onSyncComplete, isFresh, lastSynced }: RefreshButtonProps) {
+export default function RefreshButton({ onSyncComplete, isFresh, lastSynced, token }: RefreshButtonProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [timeAgo, setTimeAgo] = useState<string>('');
 
@@ -53,6 +54,7 @@ export default function RefreshButton({ onSyncComplete, isFresh, lastSynced }: R
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/matches/sync`, {
         method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const data = await res.json();

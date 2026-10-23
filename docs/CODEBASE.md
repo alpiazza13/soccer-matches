@@ -25,7 +25,7 @@ The core user experience is:
 ```mermaid
 flowchart LR
     UI[Next.js frontend] -->|Bearer JWT| API[FastAPI API]
-    UI -->|POST sync| API
+    UI -->|POST sync + bearer JWT| API
     API --> DB[(SQL database)]
     API -->|Football API token| F[Football Data API]
     API -->|production only| L[AWS Lambda sync worker]
@@ -101,7 +101,7 @@ Credentials, all methods, and all headers are enabled. There is also a catch-all
 | `GET` | `/matches` | Yes | Returns paginated matches with the current user’s `is_done` state. |
 | `POST` | `/users` | No | Validates and creates a user, returning a public user profile. |
 | `POST` | `/token` | No | Accepts OAuth2 form fields `username` and `password`; `username` is treated as the email. |
-| `POST` | `/api/matches/sync` | No | Runs or dispatches a match synchronization unless data is fresh. |
+| `POST` | `/api/matches/sync` | Yes | Requires a valid bearer JWT, then runs or dispatches a match synchronization unless data is fresh. |
 | `GET` | `/api/matches/sync/status` | No | Returns the last synchronization time and freshness. |
 | `GET` | `/users/me` | Yes | Returns the authenticated user. |
 | `DELETE` | `/users/me` | Yes | Deletes the authenticated user and cascaded user-match rows. |
@@ -375,7 +375,7 @@ When `hideScores` is enabled, scores are blurred and individually clickable. Cli
 
 ### Refresh button
 
-`RefreshButton` disables itself while syncing or when `isFresh` is true. It calls `POST /api/matches/sync`, displays the returned message, and invokes the parent callback after any successful response. It converts the last sync timestamp into relative text and refreshes that text every minute.
+`RefreshButton` disables itself while syncing or when `isFresh` is true. It calls `POST /api/matches/sync` with the current user's bearer JWT, displays the returned message, and invokes the parent callback after any successful response. It converts the last sync timestamp into relative text and refreshes that text every minute.
 
 The component explicitly handles `429`, although the current backend sync route does not return `429` itself.
 
@@ -386,7 +386,7 @@ The current implementation has several important contract details and inconsiste
 1. **Account creation response mismatch:** `POST /users` returns `UserResponse`, not a token. `UserLogin.handleCreate()` calls `setToken(data.access_token)`, so account creation does not produce a valid JWT and may store an undefined value. The user must sign in separately unless this contract is changed.
 2. **Match type is broader than backend output:** `frontend/types/matches.ts` describes fields such as `matchday`, `stage`, `last_updated`, `competition_id`, and nested competition data that `MatchSchema` does not return. The UI currently uses only `external_id`, `utc_date`, `status`, `score`, `home_team`, `away_team`, and `is_done`.
 3. **Schema naming relies on aliases:** Backend code uses `match_id` internally, while the frontend reads `external_id`. This works because Pydantic aliases are emitted by default, but changing serialization settings would break the frontend.
-4. **Sync routes are unauthenticated:** The UI only exposes them after login, but the backend does not require `get_current_user` for either sync route.
+4. **Sync route authentication differs:** `POST /api/matches/sync` requires a valid bearer JWT; the frontend sends its current token. `GET /api/matches/sync/status` remains public and returns only the last synchronization time and freshness indicator.
 5. **PostgreSQL-specific upsert:** The synchronization code imports `sqlalchemy.dialects.postgresql.insert`, so the production sync path is designed for PostgreSQL. A SQLite database is the default application database, but SQLite execution of these statements is not equivalent to the PostgreSQL dialect.
 6. **Alembic URL behavior:** Online migrations read `DATABASE_URL` from `backend/.env`; if absent, they construct an engine from an empty URL. Offline migrations use the placeholder URL in `alembic.ini`.
 7. **No explicit page-level error state:** Match-fetch failures are logged and clear the list rather than showing a dedicated UI error.

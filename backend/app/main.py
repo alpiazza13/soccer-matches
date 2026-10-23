@@ -166,7 +166,10 @@ def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/api/matches/sync")
-def trigger_sync(db: Session = Depends(get_db)):
+def trigger_sync(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
     """
     Manually triggers a sync with the Football API to update local matches.
     Uses Lambda for async processing if configured, otherwise executes directly.

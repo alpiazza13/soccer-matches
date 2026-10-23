@@ -193,6 +193,7 @@ export default function Home() {
               onSyncComplete={handleSyncComplete} 
               isFresh={syncStatus?.is_fresh ?? false}
               lastSynced={syncStatus?.last_run_at ?? null}
+              token={token}
             />
             
             <button 
